@@ -24,6 +24,15 @@ def create_application() -> FastAPI:
 
     app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 
+    # Root health check endpoint (essential for Docker healthcheck and ALB probes)
+    @app.get("/health", tags=["Health"])
+    async def root_health():
+        return {
+            "status": "healthy",
+            "service": settings.PROJECT_NAME,
+            "version": settings.VERSION
+        }
+
     return app
 
 
