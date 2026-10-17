@@ -1,0 +1,73 @@
+# Project Atlas - Report Copilot
+
+Agentic AI Assistant & Report Copilot for Cognitive Market Research and Consulting. Built with FastAPI, LangGraph, CodeIgniter 3, and MySQL.
+
+---
+
+## 🏛 Architecture Overview
+
+Project Atlas orchestrates an entitlement-aware multi-step agent workflow to analyze market research reports, detect conflicting metrics, safely query structured SQL databases, and calculate derived market projections with full citations and guardrails.
+
+```mermaid
+flowchart TD
+    A[Incoming Request: client_id + question] --> B[Input Guardrail & Intent Router]
+    
+    B -->|Out of Scope / Politics| C[Polite Refusal Node]
+    B -->|Direct Prompt Attack e.g. 'List all emails'| D[Security Refusal & Log Injection]
+    B -->|Aggregate Query e.g. 'Which sector has most reports?'| E[Read-Only MySQL SQL Tool]
+    B -->|Market Research / Projections| F[Entitlement-Aware Retriever]
+    
+    F -->|Document Has Trap Footnote| G[Data Sanitizer / Isolation Layer]
+    G --> H{Requires Math / Projections?}
+    H -->|Yes e.g. 2030 APAC Market| I[Deterministic Calculator Tool]
+    H -->|No| J[Draft Synthesis Node]
+    I --> J
+    
+    J --> K[Critic & Conflict Detector Node]
+    K -->|Confidence < Threshold OR Missing Citation| L[Escalation Node: Insert Ticket in MySQL]
+    K -->|Passes Fact Check| M[Final Response Formatter]
+    
+    L --> N[Structured JSON Response]
+    M --> N
+    C --> N
+    D --> N
+    E --> N
+```
+
+---
+
+## 🚀 Key Features & Edge Case Handling
+
+1. **Entitlement-Aware RAG**:
+   - Clients only retrieve data from reports they have purchased (filtered at vector database query time).
+   - If a client asks for unpurchased reports, the copilot reports existence and provides an upgrade path without leaking underlying figures.
+
+2. **Conflict Detection & Scope Differentiation**:
+   - Compares metrics across multiple sources (e.g., hardware-only vs total market scope).
+   - Shows differences transparently without averaging or hallucinating consensus.
+
+3. **Missing / Derived Values**:
+   - Computes market projections using deterministic formulas (e.g., CAGR compounding) with explicit assumptions and base-year caveats.
+   - Clearly flags numbers as *derived estimates*, not quoted facts.
+
+4. **Security & Prompt Injection Defenses**:
+   - Treats retrieved document content strictly as data, neutralizing embedded instructions or prompt injections.
+   - Restricts database access through a dedicated read-only MySQL user, blocking DDL/DML write statements and natural language attacks.
+
+5. **Human-in-the-Loop Escalation**:
+   - Automatically escalates queries to human analysts via MySQL support tickets if model confidence falls below threshold.
+
+6. **Observability & Monitoring**:
+   - End-to-end tracing, token usage, latency tracking, and request cost auditing via Langfuse / LangSmith.
+
+---
+
+## 🛠 Tech Stack
+
+- **Agent Engine**: LangGraph & Python 3.11+
+- **API Service**: FastAPI (Typed Pydantic Models, Async)
+- **Portal & Frontend**: CodeIgniter 3 (PHP)
+- **Database**: MySQL 8.0 (Structured metadata, entitlements, feedback & tickets)
+- **Vector Store**: ChromaDB / Qdrant
+- **Observability**: Langfuse / LangSmith
+- **Containerization**: Docker Compose
