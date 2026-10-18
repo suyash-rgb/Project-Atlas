@@ -46,7 +46,19 @@ CREATE TABLE IF NOT EXISTS feedback (
     client_id VARCHAR(32) NOT NULL,
     message_id VARCHAR(128) NOT NULL,
     rating VARCHAR(16) NOT NULL,
+    query TEXT,
     comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS conversations (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    session_id VARCHAR(64) NOT NULL,
+    client_id VARCHAR(32) NOT NULL,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    confidence FLOAT DEFAULT 1.0,
+    escalated BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 

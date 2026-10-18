@@ -69,6 +69,20 @@ class Chat extends CI_Controller {
         // Send query to Python FastAPI service via Atlas_client
         $response = $this->atlas_client->send_chat($client_id, $query);
 
+        // Persist conversation if database is active and response succeeded
+        if (isset($this->db) && isset($this->db->conn_id) && $this->db->conn_id && isset($response['data'])) {
+            $data_payload = $response['data'];
+            $this->db->insert('conversations', array(
+                'session_id' => session_id() ?: ('sess-' . time()),
+                'client_id'  => $client_id,
+                'question'   => $query,
+                'answer'     => isset($data_payload['answer']) ? $data_payload['answer'] : '',
+                'confidence' => isset($data_payload['confidence']) ? (float)$data_payload['confidence'] : 1.0,
+                'escalated'  => !empty($data_payload['escalated']) ? 1 : 0,
+                'created_at' => date('Y-m-d H:i:s')
+            ));
+        }
+
         $this->output
             ->set_content_type('application/json')
             ->set_status_header($response['code'])
@@ -85,6 +99,9 @@ class Chat extends CI_Controller {
         }
 
         $input = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($input)) {
+            $input = $this->input->post();
+        }
         if (!is_array($input)) {
             $this->output
                 ->set_content_type('application/json')
@@ -118,6 +135,44 @@ class Chat extends CI_Controller {
     }
 
     /**
+     * AJAX endpoint to persist completed streamed conversation history.
+     */
+    public function record_conversation() {
+        if (!$this->input->is_ajax_request() && $this->input->method() !== 'post') {
+            show_404();
+            return;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($input)) {
+            $input = $this->input->post();
+        }
+
+        $client_id = isset($input['client_id']) ? $this->security->xss_clean($input['client_id']) : 'C-01';
+        $question = isset($input['question']) ? $this->security->xss_clean($input['question']) : '';
+        $answer = isset($input['answer']) ? $this->security->xss_clean($input['answer']) : '';
+        $confidence = isset($input['confidence']) ? (float)$input['confidence'] : 1.0;
+        $escalated = !empty($input['escalated']) ? 1 : 0;
+        $session_id = isset($input['session_id']) ? $this->security->xss_clean($input['session_id']) : (session_id() ?: ('sess-' . time()));
+
+        if (isset($this->db) && isset($this->db->conn_id) && $this->db->conn_id && $question !== '') {
+            $this->db->insert('conversations', array(
+                'session_id' => $session_id,
+                'client_id'  => $client_id,
+                'question'   => $question,
+                'answer'     => $answer,
+                'confidence' => $confidence,
+                'escalated'  => $escalated,
+                'created_at' => date('Y-m-d H:i:s')
+            ));
+        }
+
+        $this->output
+            ->set_content_type('application/json')
+            ->set_output(json_encode(array('status' => 'success')));
+    }
+
+    /**
      * AJAX endpoint to record thumbs-up / thumbs-down user feedback
      */
     public function feedback() {
@@ -128,21 +183,38 @@ class Chat extends CI_Controller {
 
         $raw_input = file_get_contents('php://input');
         $input = json_decode($raw_input, true);
+        if (!is_array($input)) {
+            $input = $this->input->post();
+        }
 
         $client_id = isset($input['client_id']) ? $this->security->xss_clean($input['client_id']) : 'C-01';
+        $message_id = isset($input['message_id']) ? $this->security->xss_clean($input['message_id']) : ('msg-' . time());
+        $rating = isset($input['rating']) ? $this->security->xss_clean($input['rating']) : 'up';
         $query = isset($input['query']) ? $this->security->xss_clean($input['query']) : '';
-        $rating = isset($input['rating']) ? (int)$input['rating'] : 1; // 1 = up, 0 = down
-        $comments = isset($input['comments']) ? $this->security->xss_clean($input['comments']) : '';
+        $comment = isset($input['comment']) ? $this->security->xss_clean($input['comment']) : '';
 
         // If database connection is active, insert into feedback table
         if (isset($this->db) && isset($this->db->conn_id) && $this->db->conn_id) {
-            $this->db->insert('feedback', array(
-                'client_id' => $client_id,
-                'query'     => $query,
-                'rating'    => $rating,
-                'comments'  => $comments,
-                'timestamp' => date('Y-m-d H:i:s')
+            $inserted = $this->db->insert('feedback', array(
+                'client_id'  => $client_id,
+                'message_id' => $message_id,
+                'rating'     => $rating,
+                'query'      => $query,
+                'comment'    => $comment,
+                'created_at' => date('Y-m-d H:i:s')
             ));
+
+            if (!$inserted) {
+                log_message('error', 'Failed to insert feedback into MySQL.');
+                $this->output
+                    ->set_content_type('application/json')
+                    ->set_status_header(500)
+                    ->set_output(json_encode(array(
+                        'status'  => 'error',
+                        'message' => 'Failed to save feedback to database.'
+                    )));
+                return;
+            }
         }
 
         $this->output

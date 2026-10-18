@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token-name" content="<?php echo $this->security->get_csrf_token_name(); ?>">
+    <meta name="csrf-hash" content="<?php echo $this->security->get_csrf_hash(); ?>">
     <title><?php echo html_escape($title); ?></title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -806,6 +808,20 @@
         // Initialize sidebar on page load
         updateSidebarEntitlements();
 
+        // Security: HTML entity encoding against XSS attacks
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        const csrfTokenName = document.querySelector('meta[name="csrf-token-name"]')?.getAttribute('content') || 'csrf_test_name';
+        const csrfHash = document.querySelector('meta[name="csrf-hash"]')?.getAttribute('content') || '';
+
         function triggerQuickQuery(text) {
             chatInput.value = text;
             sendMessage();
@@ -826,18 +842,20 @@
             let html = '<div class="meta-badges-row">';
             if (data.confidence !== undefined) {
                 const confPercent = Math.round(data.confidence * 100);
-                html += `<span class="badge-pill conf"><i class="fa-solid fa-circle-check"></i> ${confPercent}% Confidence</span>`;
+                html += `<span class="badge-pill conf"><i class="fa-solid fa-circle-check"></i> ${escapeHtml(confPercent)}% Confidence</span>`;
             }
             if (data.escalated) {
                 html += `<span class="badge-pill escalate"><i class="fa-solid fa-headset"></i> Escalated to Human Analyst</span>`;
             }
             if (data.intent) {
-                html += `<span class="badge-pill router">Intent: ${data.intent}</span>`;
+                html += `<span class="badge-pill router">Intent: ${escapeHtml(data.intent)}</span>`;
             }
             html += '</div>';
 
-            // Render simple markdown in answer
-            let formattedAnswer = (data.answer || data.message || 'No answer generated.')
+            // Escape all HTML to prevent XSS, then format simple markdown
+            const rawAnswer = data.answer || data.message || 'No answer generated.';
+            const safeAnswer = escapeHtml(rawAnswer);
+            const formattedAnswer = safeAnswer
                 .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
                 .replace(/\*(.*?)\*/g, '<em>$1</em>')
                 .replace(/`([^`]+)`/g, '<code>$1</code>')
@@ -846,47 +864,57 @@
 
             html += `<div class="answer-content">${formattedAnswer}</div>`;
 
-            // Derived values / formulas
+            // Derived values / formulas (properly escaped)
             if (data.derived_values && data.derived_values.length > 0) {
                 html += '<div class="derived-callout"><strong><i class="fa-solid fa-calculator"></i> Derived Projection (Deterministic Math):</strong><br>';
                 data.derived_values.forEach(d => {
-                    const val = d.estimated_value || d.value || '';
-                    const assum = Array.isArray(d.assumptions) ? d.assumptions.join('; ') : d.assumptions;
-                    html += `• <strong>${d.metric}:</strong> <span style="color:var(--cmr-primary); font-weight:700;">${val}</span><br>&nbsp;&nbsp;<em>Formula:</em> <code>${d.formula}</code><br>&nbsp;&nbsp;<em>Assumptions:</em> <small>${assum}</small><br>`;
+                    const val = escapeHtml(d.estimated_value || d.value || '');
+                    const metric = escapeHtml(d.metric || 'Metric');
+                    const formula = escapeHtml(d.formula || '');
+                    const rawAssum = Array.isArray(d.assumptions) ? d.assumptions.join('; ') : (d.assumptions || '');
+                    const assum = escapeHtml(rawAssum);
+                    html += `• <strong>${metric}:</strong> <span style="color:var(--cmr-primary); font-weight:700;">${val}</span><br>&nbsp;&nbsp;<em>Formula:</em> <code>${formula}</code><br>&nbsp;&nbsp;<em>Assumptions:</em> <small>${assum}</small><br>`;
                 });
                 html += '</div>';
             }
 
-            // Conflicts
+            // Conflicts (properly escaped)
             if (data.conflicts && data.conflicts.length > 0) {
                 html += '<div class="conflict-callout"><strong><i class="fa-solid fa-triangle-exclamation"></i> Methodological Conflict & Scope Divergence:</strong><br>';
                 data.conflicts.forEach(c => {
-                    const topic = c.metric || c.topic || 'Report Comparison';
-                    const diff = c.scope_differences || c.resolution || '';
-                    html += `• <strong>${topic}:</strong> ${c.description}<br>&nbsp;&nbsp;<em>Methodology Resolution:</em> ${diff}<br>`;
+                    const topic = escapeHtml(c.metric || c.topic || 'Report Comparison');
+                    const desc = escapeHtml(c.description || '');
+                    const diff = escapeHtml(c.scope_differences || c.resolution || '');
+                    html += `• <strong>${topic}:</strong> ${desc}<br>&nbsp;&nbsp;<em>Methodology Resolution:</em> ${diff}<br>`;
                 });
                 html += '</div>';
             }
 
-            // Citations
+            // Citations (properly escaped)
             if (data.citations && data.citations.length > 0) {
                 html += '<div class="citations-section"><h5><i class="fa-solid fa-bookmark"></i> Verified Source Citations</h5>';
                 data.citations.forEach(cit => {
                     if (typeof cit === 'string') {
-                        html += `<div>• <span style="background:var(--cmr-primary); color:#fff; padding:2px 8px; border-radius:4px; font-weight:700; font-size:12px;"><i class="fa-solid fa-file-pdf"></i> ${cit}</span> Verified reference in Cognitive Market Research database</div>`;
+                        html += `<div>• <span style="background:var(--cmr-primary); color:#fff; padding:2px 8px; border-radius:4px; font-weight:700; font-size:12px;"><i class="fa-solid fa-file-pdf"></i> ${escapeHtml(cit)}</span> Verified reference in Cognitive Market Research database</div>`;
                     } else {
-                        html += `<div>• <strong>${cit.report_id}</strong> (Page ${cit.page}): <em>"${cit.quote || cit.text || ''}"</em></div>`;
+                        const repId = escapeHtml(cit.report_id || '');
+                        const pg = escapeHtml(cit.page || '1');
+                        const q = escapeHtml(cit.quote || cit.text || '');
+                        html += `<div>• <strong>${repId}</strong> (Page ${pg}): <em>"${q}"</em></div>`;
                     }
                 });
                 html += '</div>';
             }
 
-            // Feedback buttons
+            // Generate message identifier for feedback linking
+            const messageId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+
+            // Feedback buttons with messageId
             html += `
-                <div class="feedback-bar">
+                <div class="feedback-bar" data-msg-id="${messageId}">
                     <span>Was this response helpful and accurate?</span>
-                    <button class="feedback-btn" onclick="submitFeedback(1, this)"><i class="fa-regular fa-thumbs-up"></i> Helpful</button>
-                    <button class="feedback-btn" onclick="submitFeedback(0, this)"><i class="fa-regular fa-thumbs-down"></i> Inaccurate</button>
+                    <button class="feedback-btn" onclick="submitFeedback(1, this, '${messageId}')"><i class="fa-regular fa-thumbs-up"></i> Helpful</button>
+                    <button class="feedback-btn" onclick="submitFeedback(0, this, '${messageId}')"><i class="fa-regular fa-thumbs-down"></i> Inaccurate</button>
                 </div>
             `;
 
@@ -978,6 +1006,7 @@
             if (!query) return;
 
             appendUserMessage(query);
+            chatInput.dataset.lastQuery = query;
             chatInput.value = '';
             sendBtn.disabled = true;
 
@@ -988,13 +1017,22 @@
 
             try {
                 const streamUrl = '<?php echo site_url("chat/stream"); ?>'.replace(/^https?:\/\/[^\/]+/, window.location.origin);
+                const reqHeaders = {
+                    'Content-Type': 'application/json',
+                    'Accept': 'text/event-stream'
+                };
+                if (csrfHash) {
+                    reqHeaders['X-CSRF-Token'] = csrfHash;
+                }
+
                 const res = await fetch(streamUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'text/event-stream'
-                    },
-                    body: JSON.stringify({ client_id: clientId, query: query })
+                    headers: reqHeaders,
+                    body: JSON.stringify({
+                        client_id: clientId,
+                        query: query,
+                        [csrfTokenName]: csrfHash
+                    })
                 });
 
                 if (!res.ok) {
@@ -1019,12 +1057,32 @@
 
                 streaming.bubble.remove();
                 appendAssistantResponse(completeResponse);
+
+                // Persist completed conversation in MySQL history
+                if (completeResponse) {
+                    const recordUrl = '<?php echo site_url("chat/record_conversation"); ?>'.replace(/^https?:\/\/[^\/]+/, window.location.origin);
+                    fetch(recordUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRF-Token': csrfHash
+                        },
+                        body: JSON.stringify({
+                            client_id: clientId,
+                            question: query,
+                            answer: completeResponse.answer || '',
+                            confidence: completeResponse.confidence || 1.0,
+                            escalated: completeResponse.escalated ? 1 : 0,
+                            [csrfTokenName]: csrfHash
+                        })
+                    }).catch(() => {});
+                }
             } catch (err) {
                 const message = err.message || 'Connection error communicating with Report Copilot.';
                 if (receivedToken) {
                     const notice = document.createElement('div');
                     notice.className = 'stream-error';
-                    notice.textContent = `Response interrupted: ${message}`;
+                    notice.textContent = `Response interrupted: ${escapeHtml(message)}`;
                     streaming.bubble.appendChild(notice);
                 } else {
                     streaming.bubble.remove();
@@ -1039,17 +1097,26 @@
             }
         }
 
-        async function submitFeedback(rating, btn) {
+        async function submitFeedback(rating, btn, messageId) {
             const bar = btn.parentElement;
+            const currentQuery = chatInput.dataset.lastQuery || '';
             bar.innerHTML = '<span style="color: var(--cmr-success); font-weight: 600;"><i class="fa-solid fa-check"></i> Thank you! Your feedback has been recorded in our MySQL database.</span>';
             try {
                 const feedbackUrl = '<?php echo site_url("chat/feedback"); ?>'.replace(/^https?:\/\/[^\/]+/, window.location.origin);
+                const reqHeaders = { 'Content-Type': 'application/json' };
+                if (csrfHash) {
+                    reqHeaders['X-CSRF-Token'] = csrfHash;
+                }
                 await fetch(feedbackUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: reqHeaders,
                     body: JSON.stringify({
                         client_id: clientSelect.value,
-                        rating: rating
+                        message_id: messageId || ('msg-' + Date.now()),
+                        rating: rating === 1 ? 'up' : 'down',
+                        comment: rating === 1 ? 'Helpful and accurate response.' : 'Flagged as inaccurate or incomplete.',
+                        query: currentQuery,
+                        [csrfTokenName]: csrfHash
                     })
                 });
             } catch (e) {}

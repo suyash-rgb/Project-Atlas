@@ -307,6 +307,34 @@ switch (ENVIRONMENT)
 
 /*
  * --------------------------------------------------------------------
+ * JSON & CSRF REQUEST BRIDGE
+ * --------------------------------------------------------------------
+ *
+ * Ensure JSON payloads and X-CSRF-Token headers populate $_POST for
+ * native CodeIgniter 3 CSRF verification on AJAX requests.
+ */
+if (strtoupper($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+    if (empty($_POST)) {
+        $raw_body = file_get_contents('php://input');
+        if (!empty($raw_body)) {
+            $parsed_json = json_decode($raw_body, true);
+            if (is_array($parsed_json)) {
+                $_POST = $parsed_json;
+            }
+        }
+    }
+    $csrf_token_name = 'csrf_test_name';
+    if (!isset($_POST[$csrf_token_name])) {
+        if (!empty($_SERVER['HTTP_X_CSRF_TOKEN'])) {
+            $_POST[$csrf_token_name] = $_SERVER['HTTP_X_CSRF_TOKEN'];
+        } elseif (!empty($_SERVER['HTTP_X_XSRF_TOKEN'])) {
+            $_POST[$csrf_token_name] = $_SERVER['HTTP_X_XSRF_TOKEN'];
+        }
+    }
+}
+
+/*
+ * --------------------------------------------------------------------
  * LOAD THE BOOTSTRAP FILE
  * --------------------------------------------------------------------
  *
