@@ -1,5 +1,6 @@
 """AST-validated, entitlement-aware SQL access through MySQL's read-only role."""
 
+import concurrent.futures
 import logging
 import time
 from typing import List, Dict, Any, Optional
@@ -10,6 +11,9 @@ from app.core.observability import observe_with_tags
 from app.db.session import get_db_connection
 
 logger = logging.getLogger("project_atlas.sql")
+
+MAX_QUERY_ROWS = 100
+DEFAULT_QUERY_TIMEOUT_SECONDS = 5.0
 
 SCHEMA_DEFINITION = """
 Database Schema:
@@ -60,7 +64,7 @@ class SQLSecurityError(ValueError):
     pass
 
 
-def validate_read_only_ast(sql: str) -> exp.Expression:
+def validate_read_only_ast(sql: str, max_rows: int = MAX_QUERY_ROWS) -> exp.Expression:
     """
     Parse MySQL SQL with sqlglot and verify it contains exactly one SELECT statement.
     """
@@ -89,6 +93,21 @@ def validate_read_only_ast(sql: str) -> exp.Expression:
         if expression.find(forbidden_type):
             raise SQLSecurityError(f"Operation '{forbidden_type.__name__}' is strictly forbidden.")
 
+    # Enforce row limit
+    limit_node = expression.find(exp.Limit)
+    if limit_node and limit_node.expression:
+        try:
+            limit_val = int(str(limit_node.expression))
+        except (ValueError, TypeError):
+            raise SQLSecurityError("Invalid LIMIT clause.")
+
+        if limit_val > max_rows:
+            raise SQLSecurityError(
+                f"Requested row limit {limit_val} exceeds maximum allowed limit of {max_rows}."
+            )
+    else:
+        expression = expression.limit(max_rows)
+
     return expression
 
 
@@ -98,12 +117,13 @@ def validate_read_only_ast(sql: str) -> exp.Expression:
 )
 def execute_safe_sql(
     sql: str,
-    allowed_reports: Optional[List[str]] = None
+    allowed_reports: Optional[List[str]] = None,
+    timeout_seconds: float = DEFAULT_QUERY_TIMEOUT_SECONDS,
 ) -> List[Dict[str, Any]]:
     """
     Executes an AST-validated query through the restricted MySQL account.
     If allowed_reports is specified, verifies/filters results so unentitled paid reports
-    are never returned.
+    are never returned. Enforces row limits and execution timeouts.
     """
     try:
         expression = validate_read_only_ast(sql)
@@ -111,8 +131,8 @@ def execute_safe_sql(
         logger.warning("read_only_query_rejected error_type=%s", type(exc).__name__)
         raise
 
+    queried_tables = {table.name.lower() for table in expression.find_all(exp.Table)}
     if allowed_reports is not None:
-        queried_tables = {table.name.lower() for table in expression.find_all(exp.Table)}
         if not queried_tables or not queried_tables.issubset({"reports", "market_metrics"}):
             raise SQLSecurityError(
                 "Entitlement-scoped queries may only read reports or market_metrics."
@@ -121,16 +141,31 @@ def execute_safe_sql(
     conn = get_db_connection(readonly=True)
     cursor = conn.cursor(dictionary=True)
 
+    sanitized_sql = expression.sql("mysql")
     started_at = time.perf_counter()
     try:
-        cursor.execute(sql)
-        rows = cursor.fetchall()
+        try:
+            cursor.execute(f"SET SESSION max_execution_time = {int(timeout_seconds * 1000)}")
+        except Exception:
+            pass
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(cursor.execute, sanitized_sql)
+            try:
+                future.result(timeout=timeout_seconds)
+            except concurrent.futures.TimeoutError:
+                raise TimeoutError(f"SQL query execution exceeded timeout of {timeout_seconds}s.")
+
+        if hasattr(cursor, "fetchmany"):
+            rows = cursor.fetchmany(MAX_QUERY_ROWS)
+        else:
+            rows = cursor.fetchall()[:MAX_QUERY_ROWS]
         results = [dict(row) for row in rows]
     except Exception as exc:
         logger.exception(
             "read_only_query_failed error_type=%s table_count=%s",
             type(exc).__name__,
-            len(queried_tables) if allowed_reports is not None else "unscoped",
+            len(queried_tables) if queried_tables else 0,
         )
         raise
     finally:
@@ -211,7 +246,7 @@ def get_client_entitlements(client_id: str) -> List[str]:
             client_id,
             type(exc).__name__,
         )
-        return fallback_map.get(client_id, ["R-101", "R-102", "R-103"])
+        return fallback_map.get(client_id, ["R-102", "R-105"])
     finally:
         cursor.close()
         conn.close()

@@ -124,3 +124,39 @@ def test_get_client_entitlements_uses_readonly_role_and_includes_public_reports(
     assert sql_tool.get_client_entitlements("C-01") == ["R-101", "R-103", "R-104"]
     assert roles == [True]
     assert connection.closed
+
+
+def test_validate_read_only_ast_rejects_limit_exceeding_max_rows():
+    with pytest.raises(sql_tool.SQLSecurityError, match="exceeds maximum allowed limit"):
+        sql_tool.validate_read_only_ast("SELECT * FROM reports LIMIT 500")
+
+
+def test_validate_read_only_ast_injects_default_limit():
+    expression = sql_tool.validate_read_only_ast("SELECT * FROM reports")
+    sql = expression.sql("mysql")
+    assert f"LIMIT {sql_tool.MAX_QUERY_ROWS}" in sql
+
+
+def test_execute_safe_sql_truncates_to_max_rows(monkeypatch):
+    many_rows = [{"report": "R-101", "val": i} for i in range(150)]
+    connection = FakeConnection(many_rows)
+    monkeypatch.setattr(sql_tool, "get_db_connection", lambda **_: connection)
+
+    rows = sql_tool.execute_safe_sql(
+        "SELECT report, val FROM market_metrics",
+        allowed_reports=["R-101"]
+    )
+    assert len(rows) == sql_tool.MAX_QUERY_ROWS
+
+
+def test_execute_safe_sql_timeout_raises_timeout_error(monkeypatch):
+    import time
+    connection = FakeConnection([])
+    def slow_execute(*args, **kwargs):
+        time.sleep(0.2)
+    connection.fake_cursor.execute = slow_execute
+    monkeypatch.setattr(sql_tool, "get_db_connection", lambda **_: connection)
+
+    with pytest.raises(TimeoutError, match="exceeded timeout"):
+        sql_tool.execute_safe_sql("SELECT report FROM reports", allowed_reports=["R-101"], timeout_seconds=0.05)
+
