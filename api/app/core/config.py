@@ -1,5 +1,9 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 
 
 class Settings(BaseSettings):
@@ -28,7 +32,7 @@ class Settings(BaseSettings):
     LANGFUSE_HOST: Optional[str] = None
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(REPOSITORY_ROOT / ".env"),
         env_file_encoding="utf-8",
         extra="ignore"
     )

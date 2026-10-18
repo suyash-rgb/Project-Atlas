@@ -109,6 +109,25 @@ different from the read-write username. Start the services with:
 docker compose up --build
 ```
 
+The portal forwards `API_KEY` as `ATLAS_API_KEY` to FastAPI. If running FastAPI
+outside Compose while the portal remains containerized, both processes must use
+the same `API_KEY`: set it in the repository-root `.env` for the local API and
+in the environment used to start the portal container. FastAPI rejects missing
+or mismatched keys; it never logs the key itself. Each API response includes an
+`X-Request-ID`, and backend/portal logs record that ID with request status and
+failure category so a failed stream can be correlated without logging its
+question text.
+
+For a host-run API with a containerized portal, set `FASTAPI_URL` to
+`http://host.docker.internal:8888` and keep the API process running on
+`0.0.0.0:8888`. For a fully Compose-managed stack, use `http://api:8000`.
+The API's `/health` route confirms reachability but does not authenticate;
+authenticated chat requests return `403` for a missing/mismatched key and
+`503` when the API itself has no key configured. A portal `502`/`503` instead
+points to a connection/configuration problem between CI3 and FastAPI. The
+portal's CI3 error log is enabled at error level under
+`portal/application/logs/`; Apache access logs also show the HTTP status.
+
 ### Streaming chat responses
 
 The CI3 chat view uses browser `fetch()` with a readable response stream. The

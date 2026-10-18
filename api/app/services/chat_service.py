@@ -51,7 +51,11 @@ class ChatService:
         if cached_response is not None:
             if token_callback is not None:
                 token_callback(cached_response.answer)
-            logger.info(f"Cache HIT for client={cleaned_client}: {cleaned_question[:50]}...")
+            logger.info(
+                "chat_cache_hit client_id=%s question_length=%s",
+                cleaned_client,
+                len(cleaned_question),
+            )
             telemetry.record_request(
                 client_id=cleaned_client,
                 question=cleaned_question,
@@ -66,7 +70,11 @@ class ChatService:
             return cached_response
 
         # 2. Fresh Agent Execution
-        logger.info(f"Processing query for client={cleaned_client}: {cleaned_question[:60]}...")
+        logger.info(
+            "chat_processing_started client_id=%s question_length=%s",
+            cleaned_client,
+            len(cleaned_question),
+        )
         t0 = time.time()
 
         try:
@@ -99,10 +107,18 @@ class ChatService:
 
             return response
         except TimeoutError as te:
-            logger.error(f"Agent pipeline timeout for client {cleaned_client}: {te}")
+            logger.warning(
+                "agent_pipeline_failed reason=timeout client_id=%s error_type=%s",
+                cleaned_client,
+                type(te).__name__,
+            )
             raise
         except Exception as e:
-            logger.error(f"Agent pipeline execution failure: {e}", exc_info=True)
+            logger.exception(
+                "agent_pipeline_failed reason=unexpected client_id=%s error_type=%s",
+                cleaned_client,
+                type(e).__name__,
+            )
             raise
 
 

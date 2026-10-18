@@ -1,14 +1,16 @@
 import json
+import logging
 import queue
 import threading
 
-from fastapi import APIRouter, Security, HTTPException, status
+from fastapi import APIRouter, Request, Security, HTTPException, status
 from fastapi.responses import StreamingResponse
 from app.api.deps import verify_api_key
 from app.schemas.chat import ChatRequest, ChatResponse, ErrorResponse
 from app.services.chat_service import chat_service
 
 router = APIRouter(prefix="/chat", tags=["Chat & Agent Copilot"])
+logger = logging.getLogger("project_atlas.chat_api")
 
 
 def _encode_sse(event: str, payload: dict) -> str:
@@ -47,7 +49,11 @@ def _encode_sse(event: str, payload: dict) -> str:
         }
     }
 )
-async def chat(request: ChatRequest, _auth: str = Security(verify_api_key)):
+async def chat(
+    request: ChatRequest,
+    http_request: Request,
+    _auth: str = Security(verify_api_key),
+):
     """
     HTTP Controller for Report Copilot conversational queries.
     - Validates payload and client identity.
@@ -65,15 +71,23 @@ async def chat(request: ChatRequest, _auth: str = Security(verify_api_key)):
             detail=str(ve)
         )
     except TimeoutError as te:
+        logger.warning(
+            "chat_request_failed reason=timeout request_id=%s",
+            getattr(http_request.state, "request_id", "unavailable"),
+        )
         raise HTTPException(
             status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-            detail=f"Query processing timed out: {str(te)}"
-        )
+            detail="Query processing timed out."
+        ) from te
     except Exception as e:
+        logger.exception(
+            "chat_request_failed reason=agent_error request_id=%s",
+            getattr(http_request.state, "request_id", "unavailable"),
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Agent workflow error: {str(e)}"
-        )
+            detail="The Report Copilot could not process this request."
+        ) from e
 
 
 @router.post(
@@ -87,7 +101,11 @@ async def chat(request: ChatRequest, _auth: str = Security(verify_api_key)):
         503: {"model": ErrorResponse, "description": "Service Unavailable - API authentication is not configured"},
     },
 )
-async def stream_chat(request: ChatRequest, _auth: str = Security(verify_api_key)):
+async def stream_chat(
+    request: ChatRequest,
+    http_request: Request,
+    _auth: str = Security(verify_api_key),
+):
     """Stream synthesis tokens, then emit the complete structured response."""
     if not request.client_id.strip():
         raise HTTPException(status_code=400, detail="client_id cannot be empty")
@@ -95,6 +113,7 @@ async def stream_chat(request: ChatRequest, _auth: str = Security(verify_api_key
         raise HTTPException(status_code=400, detail="question cannot be empty or whitespace only")
 
     events = queue.Queue()
+    request_id = getattr(http_request.state, "request_id", "unavailable")
 
     def process_query():
         try:
@@ -107,8 +126,10 @@ async def stream_chat(request: ChatRequest, _auth: str = Security(verify_api_key
         except ValueError as exc:
             events.put(("error", {"message": str(exc), "code": 400}))
         except TimeoutError:
+            logger.warning("stream_request_failed reason=timeout request_id=%s", request_id)
             events.put(("error", {"message": "Query processing timed out.", "code": 504}))
         except Exception:
+            logger.exception("stream_request_failed reason=agent_error request_id=%s", request_id)
             events.put(("error", {"message": "Agent workflow failed.", "code": 500}))
         finally:
             events.put((None, None))

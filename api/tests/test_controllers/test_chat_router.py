@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import patch
 from app.schemas.chat import ChatResponse
 
@@ -9,18 +10,32 @@ class TestChatRouter:
         data = response.json()
         assert "Invalid or missing API Key" in data["detail"]
 
-    def test_chat_returns_503_when_api_key_is_not_configured(self, client, monkeypatch):
+    def test_invalid_api_key_is_logged_without_logging_the_key(self, client, caplog):
+        supplied_key = "sensitive-invalid-test-key"
+        with caplog.at_level(logging.WARNING, logger="project_atlas.auth"):
+            response = client.post(
+                "/api/v1/chat/stream",
+                json={"client_id": "C-01", "question": "test"},
+                headers={"X-API-Key": supplied_key},
+            )
+
+        assert response.status_code == 403
+        assert "reason=invalid_key" in caplog.text
+        assert "request_id=" in caplog.text
+        assert supplied_key not in caplog.text
+        assert response.headers["x-request-id"]
+
+    def test_chat_returns_503_when_api_key_is_not_configured(self, client, monkeypatch, caplog):
         from app.core.config import settings
 
         monkeypatch.setattr(settings, "API_KEY", None)
-        response = client.post(
-            "/api/v1/chat",
-            json={"client_id": "C-01", "question": "test"},
-            headers={"X-API-Key": "pytest-only-api-key"},
-        )
+        with caplog.at_level(logging.ERROR, logger="project_atlas.auth"):
+            response = client.post("/api/v1/chat", json={"client_id": "C-01", "question": "test"})
 
         assert response.status_code == 503
         assert response.json()["detail"] == "API authentication is not configured"
+        assert "reason=server_key_not_configured" in caplog.text
+        assert response.headers["x-request-id"] in caplog.text
 
     def test_chat_with_empty_question_returns_400(self, client, auth_headers):
         response = client.post(

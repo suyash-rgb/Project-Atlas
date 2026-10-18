@@ -20,6 +20,14 @@ class Atlas_client {
         $this->api_base_url = getenv('FASTAPI_URL');
         $this->api_key = getenv('ATLAS_API_KEY');
         if (!$this->api_base_url || !$this->api_key) {
+            $missing = array();
+            if (!$this->api_base_url) {
+                $missing[] = 'FASTAPI_URL';
+            }
+            if (!$this->api_key) {
+                $missing[] = 'ATLAS_API_KEY';
+            }
+            log_message('error', 'Atlas_client missing required configuration: ' . implode(', ', $missing));
             throw new RuntimeException('FASTAPI_URL and ATLAS_API_KEY must be configured.');
         }
         $url_parts = parse_url($this->api_base_url);
@@ -29,6 +37,7 @@ class Atlas_client {
             || !isset($url_parts['scheme'], $url_parts['host'])
             || !in_array(strtolower($url_parts['scheme']), array('http', 'https'), true)
         ) {
+            log_message('error', 'Atlas_client FASTAPI_URL must be an absolute HTTP or HTTPS URL.');
             throw new RuntimeException('FASTAPI_URL must be an absolute HTTP or HTTPS URL.');
         }
 
@@ -87,6 +96,7 @@ class Atlas_client {
 
         $http_code = 0;
         $content_type = 'text/event-stream';
+        $request_id = '';
         $headers_sent = false;
 
         curl_setopt($ch, CURLOPT_URL, $url);
@@ -99,27 +109,45 @@ class Atlas_client {
             'Accept: text/event-stream',
             'X-API-Key: ' . $this->api_key
         ));
-        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$http_code, &$content_type, &$headers_sent) {
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$http_code, &$content_type, &$request_id, &$headers_sent) {
             $length = strlen($header);
             if (preg_match('/^HTTP\/\S+\s+(\d+)/i', $header, $matches)) {
                 $http_code = (int)$matches[1];
             } elseif (stripos($header, 'Content-Type:') === 0) {
                 $content_type = trim(substr($header, strlen('Content-Type:')));
+            } elseif (stripos($header, 'X-Request-ID:') === 0) {
+                $candidate = trim(substr($header, strlen('X-Request-ID:')));
+                if (preg_match('/^[a-f0-9-]{16,64}$/i', $candidate)) {
+                    $request_id = $candidate;
+                }
             } elseif (trim($header) === '' && $http_code > 0 && !$headers_sent) {
                 http_response_code($http_code);
                 header('Content-Type: ' . $content_type);
                 header('Cache-Control: no-cache, no-transform');
                 header('X-Accel-Buffering: no');
+                if ($request_id !== '') {
+                    header('X-Request-ID: ' . $request_id);
+                }
+                if ($http_code >= 400) {
+                    log_message(
+                        'error',
+                        'Atlas_client stream upstream failed: endpoint=/api/v1/chat/stream status='
+                            . $http_code . ' request_id=' . ($request_id !== '' ? $request_id : 'unavailable')
+                    );
+                }
                 $headers_sent = true;
             }
             return $length;
         });
-        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($curl, $chunk) use (&$headers_sent, &$http_code, &$content_type) {
+        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($curl, $chunk) use (&$headers_sent, &$http_code, &$content_type, &$request_id) {
             if (!$headers_sent) {
                 http_response_code($http_code > 0 ? $http_code : 502);
                 header('Content-Type: ' . $content_type);
                 header('Cache-Control: no-cache, no-transform');
                 header('X-Accel-Buffering: no');
+                if ($request_id !== '') {
+                    header('X-Request-ID: ' . $request_id);
+                }
                 $headers_sent = true;
             }
             echo $chunk;
@@ -199,7 +227,7 @@ class Atlas_client {
 
         $decoded = json_decode($response, true);
         if ($http_code >= 400) {
-            log_message('error', "Atlas_client received HTTP {$http_code}.");
+            log_message('error', "Atlas_client upstream request failed: endpoint={$endpoint} status={$http_code}.");
             return array(
                 'status'  => 'error',
                 'code'    => $http_code,

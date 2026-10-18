@@ -1,9 +1,64 @@
+import logging
+import time
+from uuid import uuid4
+
 from fastapi import FastAPI
 # Project Atlas API Gateway
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api.v1.api import api_router as api_v1_router
+
+logger = logging.getLogger("project_atlas.http")
+
+
+class RequestLoggingMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        request_id = uuid4().hex
+        scope.setdefault("state", {})["request_id"] = request_id
+        started_at = time.perf_counter()
+        status_code = 500
+
+        async def send_with_request_id(message):
+            nonlocal status_code
+            if message["type"] == "http.response.start":
+                status_code = message["status"]
+                headers = [
+                    (name, value)
+                    for name, value in message.get("headers", [])
+                    if name.lower() != b"x-request-id"
+                ]
+                headers.append((b"x-request-id", request_id.encode("ascii")))
+                message["headers"] = headers
+            elif message["type"] == "http.response.body" and not message.get("more_body", False):
+                duration_ms = (time.perf_counter() - started_at) * 1000
+                logger.info(
+                    "http_request_complete request_id=%s method=%s path=%s status=%s duration_ms=%.1f",
+                    request_id,
+                    scope["method"],
+                    scope["path"],
+                    status_code,
+                    duration_ms,
+                )
+            await send(message)
+
+        try:
+            await self.app(scope, receive, send_with_request_id)
+        except Exception:
+            logger.exception(
+                "http_request_failed request_id=%s method=%s path=%s",
+                request_id,
+                scope["method"],
+                scope["path"],
+            )
+            raise
 
 
 def create_application() -> FastAPI:
@@ -26,6 +81,7 @@ def create_application() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestLoggingMiddleware)
 
     app.include_router(api_v1_router, prefix=settings.API_V1_PREFIX)
 
