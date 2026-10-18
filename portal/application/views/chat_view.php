@@ -4,310 +4,815 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo html_escape($title); ?></title>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
     <style>
         :root {
-            --bg-dark: #0b0f19;
-            --panel-bg: rgba(20, 27, 45, 0.7);
-            --border: rgba(255, 255, 255, 0.08);
-            --accent: #2563eb;
-            --accent-glow: rgba(37, 99, 235, 0.25);
-            --text-main: #f8fafc;
-            --text-muted: #94a3b8;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --success: #10b981;
+            /* Cognitive Market Research Official Brand Colors */
+            --cmr-navy: #002244;
+            --cmr-dark-blue: #0f2c59;
+            --cmr-primary-blue: #0066cc;
+            --cmr-hover-blue: #004c99;
+            --cmr-accent-cyan: #00a8cc;
+            --cmr-bg-light: #f4f7fa;
+            --cmr-card-bg: #ffffff;
+            --cmr-text-dark: #1e293b;
+            --cmr-text-muted: #64748b;
+            --cmr-border: #e2e8f0;
+            --cmr-border-active: #93c5fd;
+            
+            /* Badges & System Indicators */
+            --cmr-success: #059669;
+            --cmr-success-bg: #ecfdf5;
+            --cmr-warning: #d97706;
+            --cmr-warning-bg: #fffbeb;
+            --cmr-danger: #dc2626;
+            --cmr-danger-bg: #fef2f2;
+            --cmr-info: #0284c7;
+            --cmr-info-bg: #f0f9ff;
         }
 
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Plus Jakarta Sans', sans-serif;
         }
 
         body {
-            background-color: var(--bg-dark);
-            color: var(--text-main);
+            background-color: var(--cmr-bg-light);
+            color: var(--cmr-text-dark);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            overflow-x: hidden;
         }
 
-        /* Top Navigation Header */
-        header {
-            background: var(--panel-bg);
-            border-bottom: 1px solid var(--border);
-            backdrop-filter: blur(12px);
-            padding: 1rem 2rem;
+        /* 1. Top Enterprise Utility Bar */
+        .top-utility-bar {
+            background: #001833;
+            color: #94a3b8;
+            font-size: 0.75rem;
+            padding: 0.35rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .top-utility-bar .contact-items {
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .top-utility-bar a {
+            color: #cbd5e1;
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+
+        .top-utility-bar a:hover {
+            color: #ffffff;
+        }
+
+        /* 2. Main CMR Brand Header */
+        header.main-header {
+            background: #ffffff;
+            border-bottom: 2px solid var(--cmr-border);
+            padding: 0.75rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .logo-wrap {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            text-decoration: none;
+        }
+
+        .logo-symbol {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, var(--cmr-navy), var(--cmr-primary-blue));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: -0.05em;
+            box-shadow: 0 4px 10px rgba(0, 34, 68, 0.25);
+        }
+
+        .logo-text h2 {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--cmr-navy);
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            text-transform: uppercase;
+        }
+
+        .logo-text span {
+            font-size: 0.72rem;
+            font-weight: 600;
+            color: var(--cmr-accent-cyan);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            display: block;
+        }
+
+        .header-nav {
+            display: flex;
+            align-items: center;
+            gap: 1.25rem;
+        }
+
+        .header-nav .nav-link {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--cmr-text-muted);
+            text-decoration: none;
+            padding: 0.5rem 0.75rem;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .header-nav .nav-link:hover, .header-nav .nav-link.active {
+            color: var(--cmr-primary-blue);
+            background: #eff6ff;
+        }
+
+        .client-entitlement-box {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: #f1f5f9;
+            padding: 0.35rem 0.75rem;
+            border-radius: 8px;
+            border: 1px solid var(--cmr-border);
+            font-size: 0.82rem;
+        }
+
+        .client-entitlement-box label {
+            font-weight: 600;
+            color: var(--cmr-navy);
+        }
+
+        .client-entitlement-box select {
+            background: #ffffff;
+            color: var(--cmr-text-dark);
+            border: 1px solid #cbd5e1;
+            font-weight: 500;
+            font-size: 0.82rem;
+            padding: 0.35rem 0.65rem;
+            border-radius: 6px;
+            outline: none;
+            cursor: pointer;
+        }
+
+        /* 3. Hero & Portal Banner */
+        .portal-sub-banner {
+            background: linear-gradient(90deg, var(--cmr-navy) 0%, #003366 100%);
+            color: #ffffff;
+            padding: 1.1rem 2rem;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
 
-        .brand {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .brand-badge {
-            background: var(--accent);
-            color: white;
+        .portal-sub-banner h3 {
+            font-size: 1.2rem;
             font-weight: 700;
-            padding: 0.25rem 0.6rem;
-            border-radius: 6px;
-            font-size: 0.85rem;
-            letter-spacing: 0.05em;
-        }
-
-        .brand h1 {
-            font-size: 1.15rem;
-            font-weight: 600;
-            color: var(--text-main);
-        }
-
-        .client-selector-wrap {
             display: flex;
             align-items: center;
-            gap: 0.75rem;
-            font-size: 0.875rem;
+            gap: 0.6rem;
         }
 
-        .client-selector-wrap select {
-            background: #1e293b;
-            color: var(--text-main);
-            border: 1px solid var(--border);
-            padding: 0.45rem 1rem;
-            border-radius: 6px;
-            font-size: 0.875rem;
-            outline: none;
-            cursor: pointer;
+        .badge-live-copilot {
+            background: #00a8cc;
+            color: #ffffff;
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
         }
 
-        /* Main Container */
-        main {
-            flex: 1;
-            max-width: 1050px;
-            width: 100%;
-            margin: 0 auto;
+        .portal-sub-banner p {
+            font-size: 0.82rem;
+            color: #cbd5e1;
+            margin-top: 0.15rem;
+        }
+
+        .portal-actions {
             display: flex;
-            flex-direction: column;
-            padding: 1.5rem 1rem;
-            height: calc(100vh - 75px);
+            gap: 0.75rem;
         }
 
-        /* Message Stream */
-        .chat-stream {
+        .btn-view-library {
+            background: rgba(255, 255, 255, 0.15);
+            color: #ffffff;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 0.45rem 0.85rem;
+            border-radius: 6px;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+            transition: all 0.2s;
+        }
+
+        .btn-view-library:hover {
+            background: rgba(255, 255, 255, 0.25);
+        }
+
+        /* 4. App Main Layout (Grid with Sidebar + Chat) */
+        .app-container {
             flex: 1;
-            overflow-y: auto;
-            padding-right: 0.5rem;
+            max-width: 1400px;
+            width: 100%;
+            margin: 1.25rem auto;
+            padding: 0 1.5rem;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 1.5rem;
+            height: calc(100vh - 215px);
+            min-height: 580px;
+        }
+
+        /* Sidebar: Client Profile & Purchased Library */
+        .library-sidebar {
+            background: #ffffff;
+            border: 1px solid var(--cmr-border);
+            border-radius: 12px;
+            padding: 1.25rem;
             display: flex;
             flex-direction: column;
             gap: 1.25rem;
+            overflow-y: auto;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+        }
+
+        .sidebar-section-title {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: var(--cmr-navy);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid var(--cmr-border);
+        }
+
+        .entitled-report-card {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-size: 0.82rem;
+            transition: all 0.2s;
+        }
+
+        .entitled-report-card:hover {
+            border-color: var(--cmr-border-active);
+            background: #ffffff;
+            box-shadow: 0 3px 10px rgba(0, 102, 204, 0.06);
+        }
+
+        .report-badge-id {
+            background: var(--cmr-dark-blue);
+            color: white;
+            font-weight: 700;
+            font-size: 0.7rem;
+            padding: 0.15rem 0.4rem;
+            border-radius: 4px;
+        }
+
+        .entitled-report-card .title {
+            font-weight: 600;
+            color: var(--cmr-text-dark);
+            margin: 0.35rem 0;
+            line-height: 1.3;
+        }
+
+        .entitled-report-card .meta {
+            font-size: 0.72rem;
+            color: var(--cmr-text-muted);
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .guardrail-status-card {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            border-radius: 8px;
+            padding: 0.85rem;
+            font-size: 0.78rem;
+            color: #166534;
+        }
+
+        .guardrail-status-card strong {
+            display: block;
+            margin-bottom: 0.25rem;
+        }
+
+        /* Main Chat Canvas */
+        .chat-canvas {
+            background: #ffffff;
+            border: 1px solid var(--cmr-border);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+        }
+
+        .chat-canvas-header {
+            padding: 0.85rem 1.25rem;
+            border-bottom: 1px solid var(--cmr-border);
+            background: #fdfdfd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-status-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--cmr-success);
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--cmr-success);
+            border-radius: 50%;
+            box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.2);
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); opacity: 0.7; }
+            50% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.7; }
+        }
+
+        .chat-stream {
+            flex: 1;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+            background: #fafbfc;
         }
 
         .chat-bubble {
             max-width: 85%;
             padding: 1.1rem 1.35rem;
-            border-radius: 12px;
+            border-radius: 10px;
             line-height: 1.6;
-            font-size: 0.935rem;
-            animation: fadeIn 0.25s ease forwards;
+            font-size: 0.92rem;
+            animation: slideIn 0.2s ease-out;
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(6px); }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(4px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         .user-bubble {
             align-self: flex-end;
-            background: var(--accent);
-            color: white;
+            background: var(--cmr-primary-blue);
+            color: #ffffff;
             border-bottom-right-radius: 2px;
-            box-shadow: 0 4px 12px var(--accent-glow);
+            box-shadow: 0 3px 10px rgba(0, 102, 204, 0.2);
         }
 
         .assistant-bubble {
             align-self: flex-start;
-            background: var(--panel-bg);
-            border: 1px solid var(--border);
-            color: var(--text-main);
+            background: #ffffff;
+            border: 1px solid var(--cmr-border);
+            color: var(--cmr-text-dark);
             border-bottom-left-radius: 2px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
         }
 
-        /* Structured Sections inside Assistant Bubble */
-        .badge-bar {
+        /* Structured Badges inside Copilot Bubble */
+        .meta-badges-row {
             display: flex;
             flex-wrap: wrap;
-            gap: 0.5rem;
+            gap: 0.4rem;
             margin-bottom: 0.75rem;
         }
 
-        .meta-badge {
-            font-size: 0.75rem;
-            padding: 0.2rem 0.5rem;
+        .badge-pill {
+            font-size: 0.72rem;
+            padding: 0.2rem 0.55rem;
             border-radius: 4px;
-            font-weight: 600;
+            font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 0.03em;
         }
 
-        .badge-confidence { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-        .badge-guardrail  { background: rgba(239, 68, 68, 0.2); color: #f87171; }
-        .badge-derived    { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
-        .badge-conflict   { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .badge-pill.conf { background: var(--cmr-success-bg); color: var(--cmr-success); border: 1px solid #bbf7d0; }
+        .badge-pill.escalate { background: var(--cmr-danger-bg); color: var(--cmr-danger); border: 1px solid #fecaca; }
+        .badge-pill.router { background: var(--cmr-info-bg); color: var(--cmr-info); border: 1px solid #bae6fd; }
 
-        .citations-card {
+        .answer-content {
+            font-size: 0.93rem;
+            line-height: 1.65;
+            color: #1e293b;
+        }
+
+        /* Citations, Conflicts, and Derived Cards */
+        .citations-section {
             margin-top: 1rem;
-            padding: 0.75rem 1rem;
-            background: rgba(15, 23, 42, 0.6);
-            border-left: 3px solid var(--accent);
-            border-radius: 4px;
-            font-size: 0.825rem;
+            padding: 0.85rem 1rem;
+            background: #f8fafc;
+            border-left: 3px solid var(--cmr-primary-blue);
+            border-radius: 6px;
+            font-size: 0.83rem;
         }
 
-        .citations-card h4 {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-bottom: 0.4rem;
+        .citations-section h5 {
+            font-size: 0.75rem;
+            font-weight: 700;
             text-transform: uppercase;
+            color: var(--cmr-navy);
+            margin-bottom: 0.4rem;
             letter-spacing: 0.05em;
         }
 
-        .conflicts-card {
+        .conflict-callout {
             margin-top: 0.75rem;
-            padding: 0.75rem 1rem;
-            background: rgba(245, 158, 11, 0.1);
-            border-left: 3px solid var(--warning);
-            border-radius: 4px;
-            font-size: 0.825rem;
-            color: #fde68a;
+            padding: 0.85rem 1rem;
+            background: var(--cmr-warning-bg);
+            border-left: 3px solid var(--cmr-warning);
+            border-radius: 6px;
+            font-size: 0.83rem;
+            color: #92400e;
         }
 
-        .derived-card {
+        .derived-callout {
             margin-top: 0.75rem;
-            padding: 0.75rem 1rem;
-            background: rgba(59, 130, 246, 0.1);
-            border-left: 3px solid var(--accent);
-            border-radius: 4px;
-            font-size: 0.825rem;
-            color: #bfdbfe;
+            padding: 0.85rem 1rem;
+            background: #eff6ff;
+            border-left: 3px solid var(--cmr-accent-cyan);
+            border-radius: 6px;
+            font-size: 0.83rem;
+            color: #1e40af;
         }
 
-        /* Thumbs Feedback */
-        .feedback-actions {
-            margin-top: 0.85rem;
+        .derived-callout code {
+            background: #dbeafe;
+            padding: 0.15rem 0.35rem;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-family: monospace;
+        }
+
+        .feedback-bar {
+            margin-top: 0.9rem;
+            padding-top: 0.6rem;
+            border-top: 1px solid #f1f5f9;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
-            font-size: 0.8rem;
-            color: var(--text-muted);
+            gap: 0.6rem;
+            font-size: 0.78rem;
+            color: var(--cmr-text-muted);
         }
 
         .feedback-btn {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-muted);
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            color: var(--cmr-text-dark);
             border-radius: 4px;
-            padding: 0.25rem 0.5rem;
+            padding: 0.2rem 0.5rem;
             cursor: pointer;
+            font-size: 0.78rem;
             transition: all 0.2s;
         }
 
         .feedback-btn:hover {
-            color: var(--text-main);
-            border-color: rgba(255,255,255,0.25);
+            border-color: var(--cmr-primary-blue);
+            color: var(--cmr-primary-blue);
         }
 
-        /* Input Bar */
-        .input-bar-container {
-            margin-top: 1rem;
-            background: var(--panel-bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 0.6rem 0.8rem;
+        /* Chat Input Footer */
+        .chat-canvas-footer {
+            padding: 0.85rem 1.25rem;
+            background: #ffffff;
+            border-top: 1px solid var(--cmr-border);
             display: flex;
             gap: 0.75rem;
             align-items: center;
-            backdrop-filter: blur(12px);
         }
 
-        .input-bar-container textarea {
+        .chat-input-wrapper {
             flex: 1;
-            background: transparent;
-            border: none;
-            outline: none;
-            color: var(--text-main);
-            font-size: 0.95rem;
-            resize: none;
-            max-height: 120px;
-            height: 38px;
-            line-height: 1.4;
-            padding: 0.4rem 0.5rem;
+            position: relative;
         }
 
-        .send-btn {
-            background: var(--accent);
-            color: white;
+        .chat-input-wrapper textarea {
+            width: 100%;
+            background: #f8fafc;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            padding: 0.65rem 0.9rem;
+            font-size: 0.92rem;
+            color: var(--cmr-text-dark);
+            outline: none;
+            resize: none;
+            height: 44px;
+            line-height: 1.4;
+            transition: border-color 0.2s;
+        }
+
+        .chat-input-wrapper textarea:focus {
+            border-color: var(--cmr-primary-blue);
+            background: #ffffff;
+            box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+        }
+
+        .btn-send {
+            background: var(--cmr-primary-blue);
+            color: #ffffff;
             border: none;
-            padding: 0.6rem 1.25rem;
+            padding: 0 1.5rem;
+            height: 44px;
             border-radius: 8px;
             font-weight: 600;
             font-size: 0.9rem;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
             transition: background 0.2s;
         }
 
-        .send-btn:hover {
-            background: #1d4ed8;
+        .btn-send:hover {
+            background: var(--cmr-hover-blue);
         }
 
-        .send-btn:disabled {
+        .btn-send:disabled {
             opacity: 0.5;
             cursor: not-allowed;
+        }
+
+        /* 5. Enterprise Footer */
+        footer.main-footer {
+            background: var(--cmr-navy);
+            color: #94a3b8;
+            padding: 1.25rem 2rem;
+            font-size: 0.78rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            margin-top: auto;
+        }
+
+        footer.main-footer a {
+            color: #cbd5e1;
+            text-decoration: none;
+            margin-left: 1rem;
+        }
+
+        footer.main-footer a:hover {
+            color: #ffffff;
         }
     </style>
 </head>
 <body>
 
-    <header>
-        <div class="brand">
-            <span class="brand-badge">ATLAS</span>
-            <h1>Cognitive Market Research & Consulting — Report Copilot</h1>
+    <!-- 1. Top Enterprise Utility Bar -->
+    <div class="top-utility-bar">
+        <div class="contact-items">
+            <span><i class="fa-solid fa-location-dot"></i> Viman Nagar, Pune, India & Sunnyvale, USA</span>
+            <span><i class="fa-solid fa-envelope"></i> sales@cognitivemarketresearch.com</span>
         </div>
-        <div class="client-selector-wrap">
-            <label for="clientSelect">Active Entitlement:</label>
-            <select id="clientSelect">
-                <?php foreach ($clients as $cid => $cname): ?>
-                    <option value="<?php echo html_escape($cid); ?>"><?php echo html_escape("[$cid] $cname"); ?></option>
-                <?php endforeach; ?>
-            </select>
+        <div>
+            <span>ESOMAR Corporate Member | Athenaeum Research Suite</span>
         </div>
+    </div>
+
+    <!-- 2. Main Brand Header -->
+    <header class="main-header">
+        <a href="<?php echo site_url(); ?>" class="logo-wrap">
+            <div class="logo-symbol">C</div>
+            <div class="logo-text">
+                <h2>Cognitive</h2>
+                <span>Market Research & Consulting</span>
+            </div>
+        </a>
+
+        <nav class="header-nav">
+            <a href="#" class="nav-link">Market Reports</a>
+            <a href="#" class="nav-link">Custom Consulting</a>
+            <a href="#" class="nav-link active">Report Copilot (AI)</a>
+            <a href="#" class="nav-link">Athenaeum Access</a>
+
+            <!-- Client Entitlement Switcher -->
+            <div class="client-entitlement-box">
+                <i class="fa-solid fa-building-user" style="color: var(--cmr-primary-blue);"></i>
+                <label for="clientSelect">Client Entitlement:</label>
+                <select id="clientSelect" onchange="updateSidebarEntitlements()">
+                    <?php foreach ($clients as $cid => $cname): ?>
+                        <option value="<?php echo html_escape($cid); ?>"><?php echo html_escape("[$cid] $cname"); ?></option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </nav>
     </header>
 
-    <main>
-        <div class="chat-stream" id="chatStream">
-            <div class="chat-bubble assistant-bubble">
-                <div class="badge-bar">
-                    <span class="meta-badge badge-confidence">SYSTEM ONLINE</span>
-                </div>
-                Welcome to the Cognitive Market Research <strong>Report Copilot</strong>. Select your company client entitlement above, then ask any market research or projection query (e.g. <em>"What will the smart water meter market be worth in 2030 in R-101?"</em> or <em>"Why do R-101 and R-102 disagree on 2024?"</em>).
+    <!-- 3. Portal Sub-Banner -->
+    <div class="portal-sub-banner">
+        <div>
+            <h3>
+                <i class="fa-solid fa-compass" style="color: #00a8cc;"></i>
+                Project Atlas — Report Copilot
+                <span class="badge-live-copilot">Active Agent</span>
+            </h3>
+            <p>Non-autoregressive Laya decision router with entitlement-filtered RAG & citation verification.</p>
+        </div>
+        <div class="portal-actions">
+            <a href="javascript:void(0)" class="btn-view-library" onclick="triggerQuickQuery('What reports are in your library?')">
+                <i class="fa-solid fa-database"></i> Database Summary
+            </a>
+            <a href="javascript:void(0)" class="btn-view-library" onclick="triggerQuickQuery('Why do R-101 and R-102 disagree on 2024?')">
+                <i class="fa-solid fa-code-compare"></i> Compare R-101 vs R-102
+            </a>
+        </div>
+    </div>
+
+    <!-- 4. Main Two-Column Container -->
+    <div class="app-container">
+        
+        <!-- Left Sidebar: Client Library & Entitlements -->
+        <aside class="library-sidebar">
+            <div class="sidebar-section-title">
+                <i class="fa-solid fa-folder-open"></i> Purchased Reports
             </div>
-        </div>
+            
+            <div id="entitlementList" style="display: flex; flex-direction: column; gap: 0.65rem;">
+                <!-- Populated dynamically based on selected client -->
+            </div>
 
-        <div class="input-bar-container">
-            <textarea id="chatInput" placeholder="Ask a question about your purchased reports..." rows="1"></textarea>
-            <button class="send-btn" id="sendBtn">Send</button>
-        </div>
-    </main>
+            <div class="sidebar-section-title" style="margin-top: 0.5rem;">
+                <i class="fa-solid fa-shield-halved"></i> Security Guardrail
+            </div>
 
+            <div class="guardrail-status-card">
+                <strong><i class="fa-solid fa-circle-check"></i> Unified Classifier Active</strong>
+                Directs prompt injections and SQL destructive commands to security audit logging in under 35ms.
+            </div>
+        </aside>
+
+        <!-- Right Column: Interactive Chat Canvas -->
+        <section class="chat-canvas">
+            <div class="chat-canvas-header">
+                <div class="chat-status-pill">
+                    <span class="pulse-dot"></span>
+                    <span>System 1 Decision Engine Online (30s SLA)</span>
+                </div>
+                <div style="font-size: 0.78rem; color: var(--cmr-text-muted);">
+                    Backend: <strong>FastAPI / LangGraph</strong>
+                </div>
+            </div>
+
+            <!-- Message Stream -->
+            <div class="chat-stream" id="chatStream">
+                <div class="chat-bubble assistant-bubble">
+                    <div class="meta-badges-row">
+                        <span class="badge-pill conf">SYSTEM INITIALIZED</span>
+                        <span class="badge-pill router">ENTITLEMENTS VERIFIED</span>
+                    </div>
+                    <div class="answer-content">
+                        Hello! Welcome to the <strong>Cognitive Market Research Report Copilot</strong>. 
+                        I have verified your active company license. Ask any factual lookup, growth rate derivation (CAGR), or cross-report comparison.
+                        <br><br>
+                        <em>Sample queries to try:</em>
+                        <ul style="margin-left: 1.25rem; margin-top: 0.35rem; font-size: 0.88rem;">
+                            <li><em>"What will the smart water meter market be worth in 2030 in R-101?"</em></li>
+                            <li><em>"Why does R-101 report $4.21B while R-102 reports $3.87B for 2024?"</em></li>
+                            <li><em>"Which sector has the most published reports in your database?"</em></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Input Bar -->
+            <div class="chat-canvas-footer">
+                <div class="chat-input-wrapper">
+                    <textarea id="chatInput" placeholder="Type your market research inquiry..." rows="1"></textarea>
+                </div>
+                <button class="btn-send" id="sendBtn">
+                    <span>Send</span>
+                    <i class="fa-solid fa-paper-plane"></i>
+                </button>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- 5. Corporate Footer -->
+    <footer class="main-footer">
+        <div>
+            &copy; <?php echo date('Y'); ?> Cognitive Market Research & Consulting. All Rights Reserved.
+        </div>
+        <div>
+            <a href="#">Privacy Policy</a>
+            <a href="#">Terms of Use</a>
+            <a href="#">Data Entitlements</a>
+            <a href="#">Security Audit</a>
+        </div>
+    </footer>
+
+    <!-- Interactive Logic -->
     <script>
         const chatStream = document.getElementById('chatStream');
         const chatInput = document.getElementById('chatInput');
         const sendBtn = document.getElementById('sendBtn');
         const clientSelect = document.getElementById('clientSelect');
+        const entitlementList = document.getElementById('entitlementList');
+
+        // Client Library Mapping for Demonstration
+        const clientReportMap = {
+            'C-01': [
+                { id: 'R-101', title: 'Global Smart Water Meter Market 2025-2032', year: 2024, type: 'Full Turnkey' },
+                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Hardware Only' },
+                { id: 'R-103', title: 'Residential Water Purifier Market 2025', year: 2024, type: 'Full Turnkey' },
+                { id: 'R-104', title: 'Commercial Industrial Water Treatment 2025', year: 2024, type: 'Technical Excerpt' },
+                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Full Turnkey' },
+                { id: 'R-106', title: 'Decentralized Wastewater Treatment 2025', year: 2024, type: 'Full Turnkey' }
+            ],
+            'C-02': [
+                { id: 'R-101', title: 'Global Smart Water Meter Market 2025-2032', year: 2024, type: 'Full Turnkey' },
+                { id: 'R-103', title: 'Residential Water Purifier Market 2025', year: 2024, type: 'Full Turnkey' }
+            ],
+            'C-03': [
+                { id: 'R-104', title: 'Commercial Industrial Water Treatment 2025', year: 2024, type: 'Technical Excerpt' },
+                { id: 'R-106', title: 'Decentralized Wastewater Treatment 2025', year: 2024, type: 'Full Turnkey' }
+            ],
+            'C-04': [
+                { id: 'R-101', title: 'Global Smart Water Meter Market 2025-2032', year: 2024, type: 'Full Turnkey' }
+            ],
+            'C-05': [
+                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Full Turnkey' }
+            ],
+            'C-06': [
+                { id: 'PUB-EXC', title: 'Public Excerpts Catalog', year: 2024, type: 'Public Preview' }
+            ]
+        };
+
+        function updateSidebarEntitlements() {
+            const cid = clientSelect.value;
+            const reports = clientReportMap[cid] || [];
+            entitlementList.innerHTML = '';
+            
+            reports.forEach(r => {
+                const card = document.createElement('div');
+                card.className = 'entitled-report-card';
+                card.innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="report-badge-id">${r.id}</span>
+                        <span style="font-size: 0.7rem; color: #0284c7; font-weight: 600;">${r.type}</span>
+                    </div>
+                    <div class="title">${r.title}</div>
+                    <div class="meta">
+                        <span>Year: ${r.year}</span>
+                        <span style="color: #059669;"><i class="fa-solid fa-lock-open"></i> Licensed</span>
+                    </div>
+                `;
+                entitlementList.appendChild(card);
+            });
+        }
+
+        // Initialize sidebar on page load
+        updateSidebarEntitlements();
+
+        function triggerQuickQuery(text) {
+            chatInput.value = text;
+            sendMessage();
+        }
 
         function appendUserMessage(text) {
             const bubble = document.createElement('div');
@@ -321,51 +826,54 @@
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble assistant-bubble';
 
-            let html = '<div class="badge-bar">';
+            let html = '<div class="meta-badges-row">';
             if (data.confidence !== undefined) {
                 const confPercent = Math.round(data.confidence * 100);
-                html += `<span class="meta-badge badge-confidence">Confidence: ${confPercent}%</span>`;
+                html += `<span class="badge-pill conf"><i class="fa-solid fa-circle-check"></i> ${confPercent}% Confidence</span>`;
             }
             if (data.escalated) {
-                html += `<span class="meta-badge badge-guardrail">Escalated to Human Analyst</span>`;
+                html += `<span class="badge-pill escalate"><i class="fa-solid fa-headset"></i> Escalated to Human Analyst</span>`;
+            }
+            if (data.intent) {
+                html += `<span class="badge-pill router">Intent: ${data.intent}</span>`;
             }
             html += '</div>';
 
-            html += `<div class="answer-text">${data.answer || data.message || 'No answer generated.'}</div>`;
+            html += `<div class="answer-content">${data.answer || data.message || 'No answer generated.'}</div>`;
 
             // Derived values / formulas
             if (data.derived_values && data.derived_values.length > 0) {
-                html += '<div class="derived-card"><strong>Derived Projection:</strong><br>';
+                html += '<div class="derived-callout"><strong><i class="fa-solid fa-calculator"></i> Derived Projection (Mathematical Calculation):</strong><br>';
                 data.derived_values.forEach(d => {
-                    html += `• <strong>${d.metric}:</strong> ${d.value} (Formula: <code>${d.formula}</code>, Assumptions: ${d.assumptions})<br>`;
+                    html += `• <strong>${d.metric}:</strong> ${d.value} <br>&nbsp;&nbsp;<em>Formula:</em> <code>${d.formula}</code> &nbsp;|&nbsp; <em>Assumptions:</em> ${d.assumptions}<br>`;
                 });
                 html += '</div>';
             }
 
             // Conflicts
             if (data.conflicts && data.conflicts.length > 0) {
-                html += '<div class="conflicts-card"><strong>⚠️ Methodological Conflict Detected:</strong><br>';
+                html += '<div class="conflict-callout"><strong><i class="fa-solid fa-triangle-exclamation"></i> Methodological Conflict Detected:</strong><br>';
                 data.conflicts.forEach(c => {
-                    html += `• ${c.topic}: ${c.description} (Resolution: ${c.resolution})<br>`;
+                    html += `• <strong>${c.topic}:</strong> ${c.description}<br>&nbsp;&nbsp;<em>Resolution:</em> ${c.resolution}<br>`;
                 });
                 html += '</div>';
             }
 
             // Citations
             if (data.citations && data.citations.length > 0) {
-                html += '<div class="citations-card"><h4>Verified Citations</h4>';
+                html += '<div class="citations-section"><h5><i class="fa-solid fa-bookmark"></i> Verified Source Citations</h5>';
                 data.citations.forEach(cit => {
-                    html += `<div>• <strong>${cit.report_id}</strong> (p. ${cit.page}): <em>"${cit.quote || cit.text || ''}"</em></div>`;
+                    html += `<div>• <strong>${cit.report_id}</strong> (Page ${cit.page}): <em>"${cit.quote || cit.text || ''}"</em></div>`;
                 });
                 html += '</div>';
             }
 
             // Feedback buttons
             html += `
-                <div class="feedback-actions">
-                    <span>Was this answer helpful?</span>
-                    <button class="feedback-btn" onclick="submitFeedback(1, this)">👍 Yes</button>
-                    <button class="feedback-btn" onclick="submitFeedback(0, this)">👎 No</button>
+                <div class="feedback-bar">
+                    <span>Was this response helpful and accurate?</span>
+                    <button class="feedback-btn" onclick="submitFeedback(1, this)"><i class="fa-regular fa-thumbs-up"></i> Helpful</button>
+                    <button class="feedback-btn" onclick="submitFeedback(0, this)"><i class="fa-regular fa-thumbs-down"></i> Inaccurate</button>
                 </div>
             `;
 
@@ -396,14 +904,14 @@
                     appendAssistantResponse(json.data);
                 } else {
                     appendAssistantResponse({
-                        answer: json.message || 'An error occurred connecting to Report Copilot.',
+                        answer: json.message || 'An error occurred while connecting to Report Copilot.',
                         confidence: 0.0,
                         escalated: true
                     });
                 }
             } catch (err) {
                 appendAssistantResponse({
-                    answer: 'Connection error communicating with the legacy backend portal.',
+                    answer: 'Connection error communicating with the CodeIgniter portal backend.',
                     confidence: 0.0,
                     escalated: true
                 });
@@ -413,8 +921,8 @@
         }
 
         async function submitFeedback(rating, btn) {
-            const container = btn.parentElement;
-            container.innerHTML = '<span style="color: #34d399;">✓ Feedback recorded! Thank you.</span>';
+            const bar = btn.parentElement;
+            bar.innerHTML = '<span style="color: var(--cmr-success); font-weight: 600;"><i class="fa-solid fa-check"></i> Thank you! Your feedback has been recorded in our MySQL database.</span>';
             try {
                 await fetch('<?php echo site_url("chat/feedback"); ?>', {
                     method: 'POST',
