@@ -43,7 +43,7 @@ class NumberedCanvas(canvas.Canvas):
         self.saveState()
         
         # Don't draw headers/footers on page 1 (Cover Page)
-        if self._pageNumber > 1:
+        if self.getPageNumber() > 1:
             # Header
             self.setFont("Helvetica-Bold", 8)
             self.setFillColor(getattr(self, 'header_color', colors.HexColor('#1E3A8A')))
@@ -68,7 +68,7 @@ class NumberedCanvas(canvas.Canvas):
             self.setFillColor(colors.HexColor('#64748B'))
             self.drawString(54, 36, getattr(self, 'confidentiality_note', 'Confidential - Licensed Enterprise Subscription'))
             
-            page_text = f"Page {self._pageNumber} of {page_count}"
+            page_text = f"Page {self.getPageNumber()} of {page_count}"
             self.drawRightString(612 - 54, 36, page_text)
             
         self.restoreState()

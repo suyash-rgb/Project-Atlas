@@ -27,6 +27,8 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "reportlab>=5.0.1",
     "pymupdf>=1.28.2",
+    "matplotlib>=3.11.2",
+    "groq>=1.7.0",
 ]
 
 [dependency-groups]
