@@ -23,7 +23,6 @@ from app.agent.tools.sql_tool import (
     execute_safe_sql,
     get_client_entitlements,
 )
-from app.services.escalation_service import escalation_service
 from app.agent.tools.retriever import get_retriever, RetrievedChunk
 from app.agent.tools.calculator import calculate_projection, extract_numbers_from_query
 from app.agent.reconcile import detect_report_conflicts
@@ -52,6 +51,7 @@ class AgentState(TypedDict):
 
 def log_escalation_to_db(client_id: str, question: str, reason: str) -> str:
     """Insert an escalation through the shared transactional service."""
+    from app.services.escalation_service import escalation_service
     ticket_id = escalation_service.log_escalation(client_id, question, reason)
     return f"ESC-{ticket_id:04d}"
 

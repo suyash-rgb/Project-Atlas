@@ -33,8 +33,13 @@ def detect_report_conflicts(
         and re.search(r"(?<!\d)(?:r-?)?102(?!\d)", query_lower) is not None
     )
     chunks_have_both = ("R-101" in report_ids and "R-102" in report_ids)
+    is_smart_water_size_query = (
+        "water" in query_lower
+        and ("meter" in query_lower or "metering" in query_lower)
+        and any(k in query_lower for k in ["market size", "size", "trust", "compare", "difference", "discrepancy"])
+    )
 
-    if mentions_both or chunks_have_both:
+    if mentions_both or chunks_have_both or (is_smart_water_size_query and ("R-101" in report_ids or "R-102" in report_ids)):
         conflicts.append(
             ConflictItem(
                 metric="Global Market Size (2024) & Projected CAGR",
