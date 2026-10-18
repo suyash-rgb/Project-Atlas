@@ -71,3 +71,15 @@ class HealthResponse(BaseModel):
     version: str
     database: str
     vector_store: str
+
+
+class FeedbackRequest(BaseModel):
+    client_id: str = Field(..., description="Client ID submitting feedback, e.g. C-01")
+    message_id: Optional[str] = Field("msg_live", description="ID of the message being rated")
+    rating: str = Field(..., description="'up' or 'down'")
+    comment: Optional[str] = Field(None, description="Optional qualitative feedback")
+
+
+class FeedbackResponse(BaseModel):
+    status: str
+    message: str
