@@ -1,12 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Report Copilot | Cognitive Market Research</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap"
+        rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <style>
         :root {
             /* Cognitive Market Research Official Brand Colors */
@@ -21,7 +24,7 @@
             --cmr-text-muted: #64748b;
             --cmr-border: #e2e8f0;
             --cmr-border-active: #93c5fd;
-            
+
             /* Badges & System Indicators */
             --cmr-success: #059669;
             --cmr-success-bg: #ecfdf5;
@@ -146,7 +149,8 @@
             transition: all 0.2s;
         }
 
-        .header-nav .nav-link:hover, .header-nav .nav-link.active {
+        .header-nav .nav-link:hover,
+        .header-nav .nav-link.active {
             color: var(--cmr-primary-blue);
             background: #eff6ff;
         }
@@ -369,9 +373,20 @@
         }
 
         @keyframes pulse {
-            0% { transform: scale(0.95); opacity: 0.7; }
-            50% { transform: scale(1.2); opacity: 1; }
-            100% { transform: scale(0.95); opacity: 0.7; }
+            0% {
+                transform: scale(0.95);
+                opacity: 0.7;
+            }
+
+            50% {
+                transform: scale(1.2);
+                opacity: 1;
+            }
+
+            100% {
+                transform: scale(0.95);
+                opacity: 0.7;
+            }
         }
 
         .chat-stream {
@@ -394,8 +409,15 @@
         }
 
         @keyframes slideIn {
-            from { opacity: 0; transform: translateY(4px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(4px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
         .user-bubble {
@@ -432,9 +454,23 @@
             letter-spacing: 0.03em;
         }
 
-        .badge-pill.conf { background: var(--cmr-success-bg); color: var(--cmr-success); border: 1px solid #bbf7d0; }
-        .badge-pill.escalate { background: var(--cmr-danger-bg); color: var(--cmr-danger); border: 1px solid #fecaca; }
-        .badge-pill.router { background: var(--cmr-info-bg); color: var(--cmr-info); border: 1px solid #bae6fd; }
+        .badge-pill.conf {
+            background: var(--cmr-success-bg);
+            color: var(--cmr-success);
+            border: 1px solid #bbf7d0;
+        }
+
+        .badge-pill.escalate {
+            background: var(--cmr-danger-bg);
+            color: var(--cmr-danger);
+            border: 1px solid #fecaca;
+        }
+
+        .badge-pill.router {
+            background: var(--cmr-info-bg);
+            color: var(--cmr-info);
+            border: 1px solid #bae6fd;
+        }
 
         .answer-content {
             font-size: 0.93rem;
@@ -586,7 +622,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            border-top: 1px solid rgba(255,255,255,0.08);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
             margin-top: auto;
         }
 
@@ -601,6 +637,7 @@
         }
     </style>
 </head>
+
 <body>
 
     <!-- 1. Top Enterprise Utility Bar -->
@@ -630,18 +667,18 @@
             <a href="#" class="nav-link active">Report Copilot (AI)</a>
             <a href="#" class="nav-link">Athenaeum Access</a>
 
-            <!-- Client Entitlement Switcher -->
+            <!-- Report Switcher -->
             <div class="client-entitlement-box">
                 <i class="fa-solid fa-building-user" style="color: var(--cmr-primary-blue);"></i>
-                <label for="clientSelect">Client Entitlement:</label>
+                <label for="clientSelect">Choose Report:</label>
                 <select id="clientSelect" onchange="updateSidebarEntitlements()">
-                    
-<option value="C-01">[C-01] Global Water Solutions (All Reports)</option>
-<option value="C-02">[C-02] City of Austin Water Utility (R-101, R-103)</option>
-<option value="C-03">[C-03] AquaTech Industrial Corp (R-104, R-106)</option>
-<option value="C-04">[C-04] Blue Delta Infrastructure (R-101 only)</option>
-<option value="C-05">[C-05] Northwind Utilities (R-105)</option>
-<option value="C-06">[C-06] Public Visitor (Public Excerpts only)</option>
+
+                    <option value="C-01">[C-01] Global Water Solutions (All Reports)</option>
+                    <option value="C-02">[C-02] City of Austin Water Utility (R-101, R-103)</option>
+                    <option value="C-03">[C-03] AquaTech Industrial Corp (R-104, R-106)</option>
+                    <option value="C-04">[C-04] Blue Delta Infrastructure (R-101 only)</option>
+                    <option value="C-05">[C-05] Northwind Utilities (R-105)</option>
+                    <option value="C-06">[C-06] Public Visitor (Public Excerpts only)</option>
 
                 </select>
             </div>
@@ -656,13 +693,14 @@
                 Project Atlas — Report Copilot
                 <span class="badge-live-copilot">Active Agent</span>
             </h3>
-            <p>Non-autoregressive Laya decision router with entitlement-filtered RAG & citation verification.</p>
         </div>
         <div class="portal-actions">
-            <a href="javascript:void(0)" class="btn-view-library" onclick="triggerQuickQuery('What reports are in your library?')">
+            <a href="javascript:void(0)" class="btn-view-library"
+                onclick="triggerQuickQuery('What reports are in your library?')">
                 <i class="fa-solid fa-database"></i> Database Summary
             </a>
-            <a href="javascript:void(0)" class="btn-view-library" onclick="triggerQuickQuery('Why do R-101 and R-102 disagree on 2024?')">
+            <a href="javascript:void(0)" class="btn-view-library"
+                onclick="triggerQuickQuery('Why do R-101 and R-102 disagree on 2024?')">
                 <i class="fa-solid fa-code-compare"></i> Compare R-101 vs R-102
             </a>
         </div>
@@ -670,25 +708,17 @@
 
     <!-- 4. Main Two-Column Container -->
     <div class="app-container">
-        
+
         <!-- Left Sidebar: Client Library & Entitlements -->
         <aside class="library-sidebar">
             <div class="sidebar-section-title">
                 <i class="fa-solid fa-folder-open"></i> Purchased Reports
             </div>
-            
+
             <div id="entitlementList" style="display: flex; flex-direction: column; gap: 0.65rem;">
                 <!-- Populated dynamically based on selected client -->
             </div>
 
-            <div class="sidebar-section-title" style="margin-top: 0.5rem;">
-                <i class="fa-solid fa-shield-halved"></i> Security Guardrail
-            </div>
-
-            <div class="guardrail-status-card">
-                <strong><i class="fa-solid fa-circle-check"></i> Unified Classifier Active</strong>
-                Directs prompt injections and SQL destructive commands to security audit logging in under 35ms.
-            </div>
         </aside>
 
         <!-- Right Column: Interactive Chat Canvas -->
@@ -698,9 +728,6 @@
                     <span class="pulse-dot"></span>
                     <span>System 1 Decision Engine Online (30s SLA)</span>
                 </div>
-                <div style="font-size: 0.78rem; color: var(--cmr-text-muted);">
-                    Backend: <strong>FastAPI / LangGraph</strong>
-                </div>
             </div>
 
             <!-- Message Stream -->
@@ -708,17 +735,30 @@
                 <div class="chat-bubble assistant-bubble">
                     <div class="meta-badges-row">
                         <span class="badge-pill conf">SYSTEM INITIALIZED</span>
-                        <span class="badge-pill router">ENTITLEMENTS VERIFIED</span>
                     </div>
                     <div class="answer-content">
-                        Hello! Welcome to the <strong>Cognitive Market Research Report Copilot</strong>. 
-                        I have verified your active company license. Ask any factual lookup, growth rate derivation (CAGR), or cross-report comparison.
+                        Hello! Welcome to the <strong>Cognitive Market Research Report Copilot</strong>.
+                        I have verified your active company license. Ask any factual lookup, growth rate derivation
+                        (CAGR), or cross-report comparison.
                         <br><br>
                         <em>Sample queries to try (click to run):</em>
-                        <ul style="margin-left: 1.25rem; margin-top: 0.5rem; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.4rem;">
-                            <li onclick="triggerQuickQuery('What will the smart water meter market be worth in 2030 in R-101?')" style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;"><i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "What will the smart water meter market be worth in 2030 in R-101?"</li>
-                            <li onclick="triggerQuickQuery('Why does R-101 report $4.21B while R-102 reports $3.87B for 2024?')" style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;"><i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Why does R-101 report $4.21B while R-102 reports $3.87B for 2024?"</li>
-                            <li onclick="triggerQuickQuery('Which sector has the most published reports in your database?')" style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;"><i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Which sector has the most published reports in your database?"</li>
+                        <ul
+                            style="margin-left: 1.25rem; margin-top: 0.5rem; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.4rem;">
+                            <li onclick="triggerQuickQuery('What will the smart water meter market be worth in 2030 in R-101?')"
+                                style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;">
+                                <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "What will the smart
+                                water meter market be worth in 2030 in R-101?"
+                            </li>
+                            <li onclick="triggerQuickQuery('Why does R-101 report $4.21B while R-102 reports $3.87B for 2024?')"
+                                style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;">
+                                <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Why does R-101
+                                report $4.21B while R-102 reports $3.87B for 2024?"
+                            </li>
+                            <li onclick="triggerQuickQuery('Which sector has the most published reports in your database?')"
+                                style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;">
+                                <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Which sector has
+                                the most published reports in your database?"
+                            </li>
                         </ul>
                     </div>
                 </div>
@@ -792,7 +832,7 @@
             const cid = clientSelect.value;
             const reports = clientReportMap[cid] || [];
             entitlementList.innerHTML = '';
-            
+
             reports.forEach(r => {
                 const card = document.createElement('div');
                 card.className = 'entitled-report-card';
@@ -916,7 +956,7 @@
             try {
                 const res = await fetch('http://127.0.0.1:8888/api/v1/chat', {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'X-API-Key': 'atlas_dev_secret_key'
                     },
@@ -952,7 +992,7 @@
             try {
                 await fetch('http://127.0.0.1:8888/api/v1/feedback', {
                     method: 'POST',
-                    headers: { 
+                    headers: {
                         'Content-Type': 'application/json',
                         'X-API-Key': 'atlas_dev_secret_key'
                     },
@@ -961,7 +1001,7 @@
                         rating: rating === 1 ? 'up' : 'down'
                     })
                 });
-            } catch (e) {}
+            } catch (e) { }
         }
 
         function triggerQuickQuery(text) {
@@ -979,4 +1019,5 @@
         });
     </script>
 </body>
+
 </html>
