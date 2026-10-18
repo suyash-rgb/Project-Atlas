@@ -59,3 +59,11 @@ Desktop.ini
 
 # Docker local overrides
 docker-compose.override.yml
+
+# Large Model Weights (Hosted publicly on Hugging Face)
+*.safetensors
+*.bin
+*.pt
+models/**/checkpoint_*
+models/**/*.safetensors
+test_donut.png

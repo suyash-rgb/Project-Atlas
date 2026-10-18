@@ -1,0 +1,92 @@
+services:
+  # -------------------------------------------------------------
+  # 1. MySQL Relational Database (Reports, Metrics, Clients, Audits)
+  # -------------------------------------------------------------
+  db:
+    image: mysql:8.0
+    container_name: atlas_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: project_atlas
+      MYSQL_USER: atlas_user
+      MYSQL_PASSWORD: atlas_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "atlas_user", "-patlas_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - atlas_network
+
+  # -------------------------------------------------------------
+  # 2. FastAPI Intelligence Engine (LangGraph + Laya 421M + RAG)
+  # -------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: atlas_api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+      - "8888:8000"
+    environment:
+      - MYSQL_HOST=db
+      - MYSQL_PORT=3306
+      - MYSQL_DATABASE=project_atlas
+      - MYSQL_USER=atlas_user
+      - MYSQL_PASSWORD=atlas_password
+      - MYSQL_READONLY_USER=atlas_readonly
+      - MYSQL_READONLY_PASSWORD=atlas_readonly_password
+      - API_KEY=atlas_dev_secret_key
+      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-20b}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - HF_HOME=/app/data/.cache/huggingface
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+      - ./project_atlas.db:/app/project_atlas.db
+    networks:
+      - atlas_network
+
+  # -------------------------------------------------------------
+  # 3. CodeIgniter 3 Corporate Portal (Cognitive Market Research)
+  # -------------------------------------------------------------
+  portal:
+    build:
+      context: ./portal
+      dockerfile: Dockerfile
+    container_name: atlas_portal
+    restart: unless-stopped
+    depends_on:
+      - api
+      - db
+    ports:
+      - "8080:80"
+    environment:
+      - FASTAPI_URL=http://api:8000
+      - ATLAS_API_KEY=atlas_dev_secret_key
+      - DB_HOST=db
+      - DB_USER=atlas_user
+      - DB_PASS=atlas_password
+      - DB_NAME=project_atlas
+    networks:
+      - atlas_network
+
+networks:
+  atlas_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
