@@ -166,12 +166,12 @@ def execute_safe_sql(
 def get_client_entitlements(client_id: str) -> List[str]:
     """Retrieve list of purchased report IDs for a client, plus public excerpts."""
     fallback_map = {
-        "C-01": ["R-101", "R-103", "R-102"],
-        "C-02": ["R-101", "R-102"],
-        "C-03": ["R-101", "R-102", "R-103", "R-104", "R-105"],
-        "C-04": ["R-102"],
-        "C-05": ["R-103"],
-        "C-06": ["R-101", "R-102", "R-103", "R-104", "R-105"],
+        "C-01": ["R-101", "R-103", "R-102", "R-105"],
+        "C-02": ["R-103", "R-102", "R-105"],
+        "C-03": ["R-104", "R-106", "R-102", "R-105"],
+        "C-04": ["R-101", "R-102", "R-105"],
+        "C-05": ["R-105", "R-102"],
+        "C-06": ["R-102", "R-105"],
     }
     try:
         conn = get_db_connection(readonly=True)
@@ -181,7 +181,7 @@ def get_client_entitlements(client_id: str) -> List[str]:
             client_id,
             type(exc).__name__,
         )
-        return fallback_map.get(client_id, ["R-101", "R-102", "R-103"])
+        return fallback_map.get(client_id, ["R-102", "R-105"])
 
     cursor = conn.cursor()
     try:

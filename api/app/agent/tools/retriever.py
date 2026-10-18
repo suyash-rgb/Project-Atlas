@@ -47,7 +47,7 @@ REPORT_METADATA_REGISTRY = {
         "publisher": "Aquila Market Insights",
         "sector": "Utilities",
         "year": 2024,
-        "access": "paid",
+        "access": "public_excerpt",
         "coverage": "Hardware only (meter units and physical endpoints)"
     },
     "R-103": {
@@ -60,18 +60,18 @@ REPORT_METADATA_REGISTRY = {
     },
     "R-104": {
         "title": "Commercial Industrial Water Treatment 2025",
-        "publisher": "H2O Analytics Excerpt",
+        "publisher": "Cognitive Market Research",
         "sector": "Industrial",
         "year": 2024,
-        "access": "public_excerpt",
+        "access": "paid",
         "coverage": "High-volume RO membranes and commercial filtration"
     },
     "R-105": {
         "title": "Smart Multi-Utility Metering Outlook 2024",
-        "publisher": "Cognitive Market Research",
+        "publisher": "Apex Grid Insights",
         "sector": "Utilities",
         "year": 2024,
-        "access": "paid",
+        "access": "public_excerpt",
         "coverage": "Multi-commodity metering (water, gas, electric grid)"
     },
     "R-106": {
@@ -212,7 +212,11 @@ class EntitlementRetriever:
         reports are excluded at the ChromaDB vector level.
         """
         # Always allow public excerpts in addition to purchased reports
-        allowed_reports = list(set(purchased_reports + ["R-104"]))
+        public_reports = [
+            rid for rid, meta in REPORT_METADATA_REGISTRY.items()
+            if "public" in meta.get("access", "").lower()
+        ]
+        allowed_reports = list(set(purchased_reports + public_reports))
 
         # Build MetadataFilter
         filters = MetadataFilters(

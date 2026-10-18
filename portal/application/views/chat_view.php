@@ -746,32 +746,37 @@
         const clientSelect = document.getElementById('clientSelect');
         const entitlementList = document.getElementById('entitlementList');
 
-        // Client Library Mapping for Demonstration
+        // Client Library Mapping for Demonstration matching MySQL seed
         const clientReportMap = {
             'C-01': [
-                { id: 'R-101', title: 'Global Smart Water Meter Market 2025-2032', year: 2024, type: 'Full Turnkey' },
-                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Hardware Only' },
-                { id: 'R-103', title: 'Residential Water Purifier Market 2025', year: 2024, type: 'Full Turnkey' },
-                { id: 'R-104', title: 'Commercial Industrial Water Treatment 2025', year: 2024, type: 'Technical Excerpt' },
-                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Full Turnkey' },
-                { id: 'R-106', title: 'Decentralized Wastewater Treatment 2025', year: 2024, type: 'Full Turnkey' }
+                { id: 'R-101', title: 'Global Smart Water Meter Market 2025', year: 2024, type: 'Full Turnkey (Paid)' },
+                { id: 'R-103', title: 'Residential Water Purifier Market 2025', year: 2024, type: 'Full Turnkey (Paid)' },
+                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' },
+                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Public Excerpt' }
             ],
             'C-02': [
-                { id: 'R-101', title: 'Global Smart Water Meter Market 2025-2032', year: 2024, type: 'Full Turnkey' },
-                { id: 'R-103', title: 'Residential Water Purifier Market 2025', year: 2024, type: 'Full Turnkey' }
+                { id: 'R-103', title: 'Residential Water Purifier Market 2025', year: 2024, type: 'Full Turnkey (Paid)' },
+                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' },
+                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Public Excerpt' }
             ],
             'C-03': [
-                { id: 'R-104', title: 'Commercial Industrial Water Treatment 2025', year: 2024, type: 'Technical Excerpt' },
-                { id: 'R-106', title: 'Decentralized Wastewater Treatment 2025', year: 2024, type: 'Full Turnkey' }
+                { id: 'R-104', title: 'Commercial Industrial Water Treatment 2025', year: 2024, type: 'Full Turnkey (Paid)' },
+                { id: 'R-106', title: 'Decentralized Wastewater Treatment 2025', year: 2024, type: 'Full Turnkey (Paid)' },
+                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' },
+                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Public Excerpt' }
             ],
             'C-04': [
-                { id: 'R-101', title: 'Global Smart Water Meter Market 2025-2032', year: 2024, type: 'Full Turnkey' }
+                { id: 'R-101', title: 'Global Smart Water Meter Market 2025', year: 2024, type: 'Full Turnkey (Paid)' },
+                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' },
+                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Public Excerpt' }
             ],
             'C-05': [
-                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Full Turnkey' }
+                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Licensed & Public' },
+                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' }
             ],
             'C-06': [
-                { id: 'PUB-EXC', title: 'Public Excerpts Catalog', year: 2024, type: 'Public Preview' }
+                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' },
+                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Public Excerpt' }
             ]
         };
 

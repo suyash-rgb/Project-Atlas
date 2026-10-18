@@ -26,13 +26,13 @@ class Chat extends CI_Controller {
     public function index() {
         $data['title'] = 'Report Copilot | Cognitive Market Research';
         
-        // Mock list of clients for the selector
+        // List of clients for the selector matching database seed
         $data['clients'] = array(
-            'C-01' => 'Global Water Solutions (All Reports)',
-            'C-02' => 'City of Austin Water Utility (R-101, R-103)',
+            'C-01' => 'Northwind Utilities (R-101, R-103)',
+            'C-02' => 'Blue Delta Infra (R-103 only)',
             'C-03' => 'AquaTech Industrial Corp (R-104, R-106)',
-            'C-04' => 'Blue Delta Infrastructure (R-101 only)',
-            'C-05' => 'Northwind Utilities (R-105)',
+            'C-04' => 'City of Austin Water Utility (R-101 only)',
+            'C-05' => 'Global Grid Analytics (R-105)',
             'C-06' => 'Public Visitor (Public Excerpts only)'
         );
 
