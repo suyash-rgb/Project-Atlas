@@ -35,6 +35,8 @@ dependencies = [
     "llama-index-embeddings-fastembed>=0.7.0",
     "fastembed>=0.9.0",
     "pypdf>=6.21.1",
+    "laya>=0.1.6",
+    "sqlglot>=30.23.0",
 ]
 
 [dependency-groups]
