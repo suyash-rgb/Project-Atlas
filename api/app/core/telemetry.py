@@ -153,6 +153,7 @@ class LangfuseBridge:
                     "total_tokens": prompt_tokens + completion_tokens
                 }
             )
+            self._client.flush()
         except Exception as e:
             logger.debug(f"Langfuse background event skipped: {e}")
 
