@@ -14,6 +14,8 @@ from typing import List, Dict, Any, Optional
 import sqlglot
 from sqlglot import exp
 
+from app.core.observability import observe_with_tags
+
 DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../project_atlas.db"))
 
 SCHEMA_DEFINITION = """
@@ -97,6 +99,10 @@ def validate_read_only_ast(sql: str) -> exp.Expression:
     return expression
 
 
+@observe_with_tags(
+    name="read_only_sql",
+    tags=["tool:sql", "data-access:read-only"],
+)
 def execute_safe_sql(
     sql: str,
     allowed_reports: Optional[List[str]] = None
@@ -140,6 +146,10 @@ def execute_safe_sql(
     return results
 
 
+@observe_with_tags(
+    name="client_entitlements",
+    tags=["tool:entitlements", "data-access:read-only"],
+)
 def get_client_entitlements(client_id: str) -> List[str]:
     """Retrieve list of purchased report IDs for a client, plus public excerpts."""
     if not os.path.exists(DB_PATH):

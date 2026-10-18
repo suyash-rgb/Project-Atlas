@@ -7,8 +7,13 @@ Detects methodological, scope, and forecast window divergences between reports
 from typing import List, Optional
 from app.schemas.chat import ConflictItem
 from app.agent.tools.retriever import RetrievedChunk
+from app.core.observability import observe_with_tags
 
 
+@observe_with_tags(
+    name="reconcile_report_conflicts",
+    tags=["tool:conflict-reconciliation", "market-research"],
+)
 def detect_report_conflicts(
     query: str,
     retrieved_chunks: List[RetrievedChunk]

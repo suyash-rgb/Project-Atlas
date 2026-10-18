@@ -13,6 +13,7 @@ import groq
 
 from app.schemas.chat import ChatResponse, ConflictItem, DerivedValueItem
 from app.agent.tools.retriever import RetrievedChunk
+from app.core.observability import observe_with_tags
 
 load_dotenv()
 
@@ -56,6 +57,11 @@ class LLMSynthesizer:
         self.client = groq.Groq(api_key=GROQ_API_KEY)
         self.model = GROQ_MODEL
 
+    @observe_with_tags(
+        name="llm_synthesizer",
+        as_type="generation",
+        tags=["tool:synthesizer", "llm:generation"],
+    )
     def synthesize(
         self,
         query: str,

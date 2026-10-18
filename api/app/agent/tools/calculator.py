@@ -7,6 +7,7 @@ import math
 import re
 from typing import Optional, Dict, Any, List
 from app.schemas.chat import DerivedValueItem
+from app.core.observability import observe_with_tags
 
 
 def compute_cagr(start_val: float, end_val: float, periods: float) -> float:
@@ -28,6 +29,10 @@ def compute_future_value(base_val: float, cagr: float, periods: float) -> float:
     return base_val * ((1.0 + cagr) ** periods)
 
 
+@observe_with_tags(
+    name="extract_calculation_inputs",
+    tags=["tool:calculator", "calculation:input-extraction"],
+)
 def extract_numbers_from_query(query: str) -> Dict[str, float]:
     """
     Extracts explicit numbers, dollar values, percentages, or years from query string.
@@ -59,6 +64,10 @@ def extract_numbers_from_query(query: str) -> Dict[str, float]:
     return found
 
 
+@observe_with_tags(
+    name="calculate_market_projection",
+    tags=["tool:calculator", "calculation:deterministic"],
+)
 def calculate_projection(
     metric_name: str,
     base_value: float,

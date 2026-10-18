@@ -4,14 +4,7 @@ from typing import Optional
 from app.schemas.chat import ChatResponse
 from app.agent.graph import run_agent_workflow
 from app.core.telemetry import telemetry
-
-try:
-    from langfuse import observe
-except ImportError:
-    def observe(*args, **kwargs):
-        def decorator(fn):
-            return fn
-        return decorator
+from app.core.observability import observe_with_tags
 
 logger = logging.getLogger("project_atlas.chat_service")
 
@@ -23,7 +16,11 @@ class ChatService:
     state initialization, telemetry, cost logging, and query caching.
     """
 
-    @observe(name="report_copilot_pipeline")
+    @observe_with_tags(
+        name="report_copilot_pipeline",
+        as_type="agent",
+        tags=["project-atlas", "report-copilot", "market-research"],
+    )
     def process_chat_query(self, client_id: str, question: str) -> ChatResponse:
         """
         Executes the LangGraph agent state machine:

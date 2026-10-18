@@ -177,6 +177,11 @@ class EntitlementRetriever:
         print(f"Ingestion complete! Total indexed chunks: {total_chunks}")
         return total_chunks
 
+    @observe_with_tags(
+        name="entitlement_filtered_retrieval",
+        as_type="retriever",
+        tags=["tool:retriever", "retrieval:entitlement-filtered"],
+    )
     def retrieve_for_client(
         self,
         query: str,

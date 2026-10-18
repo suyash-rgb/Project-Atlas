@@ -15,6 +15,8 @@ from typing import Dict, Any, Optional
 from pydantic import BaseModel
 import laya
 
+from app.core.observability import observe_with_tags
+
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "../../../models/laya_router")
 
 INTENT_QUESTIONS = {
@@ -85,6 +87,11 @@ def get_router() -> LayaRouter:
     return _router_instance
 
 
+@observe_with_tags(
+    name="guardrail_router",
+    as_type="guardrail",
+    tags=["tool:router", "security:guardrail"],
+)
 def classify_query(query: str) -> RouterDecision:
     router = get_router()
     return router.route(query)
