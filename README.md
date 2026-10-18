@@ -99,3 +99,22 @@ flowchart TD
         LangGraph_Agent -.->|Logs spans, latency, token usage, guardrail blocks| Langfuse[(Langfuse Dashboard)]
     end
 ````
+
+Loading fine-tuned Laya model...
+
+Validation Complete! Average Inference Latency: 37.22 ms
+
+--- Classification Report ---
+                    precision    recall  f1-score   support
+
+       calculation     0.9375    1.0000    0.9677        30
+        comparison     1.0000    0.9667    0.9831        30
+database_aggregate     0.9667    0.9667    0.9667        30
+    factual_lookup     0.9286    0.8667    0.8966        30
+      out_of_scope     0.9655    0.9333    0.9492        30
+  prompt_injection     0.9375    1.0000    0.9677        30
+        sql_attack     1.0000    1.0000    1.0000        30
+
+          accuracy                         0.9619       210
+         macro avg     0.9623    0.9619    0.9616       210
+      weighted avg     0.9623    0.9619    0.9616       210
