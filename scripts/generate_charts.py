@@ -1,13 +1,14 @@
 """
 Advanced Visual Chart Generator for Project Atlas Reports.
-Generates diverse publication-quality visual formats using Matplotlib:
-1. Donut Chart (Regional Market Share)
+Generates publication-quality visual formats using Matplotlib:
+1. Donut Chart with Clean Side-Legend (Regional Market Share)
 2. Trajectory Line Chart with Shaded Area / Confidence Band
 3. 100% Stacked Bar Chart (Hardware vs Software vs Services Evolution)
 4. Multi-Line Cost Erosion Trend (Ultrasonic vs Mechanical Metrology)
 5. Radar / Spider Chart (Technology Multi-Attribute Evaluation: RO vs UV vs UF)
 6. Grouped Side-by-Side Bar Chart (2024 Base vs 2030 Projected Capex)
 7. Dual-Axis Line + Bar Chart (Market Volume vs YoY Growth Rate)
+All charts optimized for high label visibility, zero overlapping, and crisp typography.
 """
 
 import os
@@ -32,32 +33,45 @@ def generate_all_charts(output_dir: str = "data/charts"):
     # 1. R-101: SMART WATER METER MARKET
     # =========================================================================
     
-    # Chart 1A: Regional Share Donut
-    fig, ax = plt.subplots(figsize=(6, 3.2), dpi=200)
+    # Chart 1A: Regional Share Donut (Fixed with Side Legend)
+    fig, ax = plt.subplots(figsize=(6.5, 3.0), dpi=200)
     regions = ['Asia-Pacific (APAC)', 'North America', 'Europe', 'Rest of World']
     shares = [38.0, 31.1, 23.0, 7.9]
-    colors_donut = ['#1E3A8A', '#2563EB', '#60A5FA', '#94A3B8']
+    colors_donut = ['#1E3A8A', '#2563EB', '#3B82F6', '#64748B']
+    
     wedges, texts, autotexts = ax.pie(
-        shares, labels=regions, autopct='%1.1f%%', startangle=140,
-        colors=colors_donut, pctdistance=0.75,
-        wedgeprops=dict(width=0.45, edgecolor='white', linewidth=2)
+        shares, 
+        autopct='%1.1f%%', 
+        startangle=140,
+        colors=colors_donut, 
+        pctdistance=0.72,
+        wedgeprops=dict(width=0.42, edgecolor='white', linewidth=2)
     )
-    for t in texts:
-        t.set_fontsize(8)
-        t.set_color('#1E293B')
     for at in autotexts:
         at.set_fontsize(8)
         at.set_weight('bold')
         at.set_color('white')
-    ax.set_title('Global Smart Water Meter Market Share by Region (2024)\nScope: Hardware, Software & Services | Source: CMR R-101', fontsize=9, fontweight='bold', pad=10, color='#0F172A')
-    plt.tight_layout()
+        
+    legend_labels = [f'{r}: {s}%' for r, s in zip(regions, shares)]
+    ax.legend(
+        wedges, legend_labels, 
+        title='Regional Share', 
+        loc='center left', 
+        bbox_to_anchor=(0.95, 0.5), 
+        fontsize=8, 
+        title_fontsize=8.5, 
+        frameon=True, 
+        framealpha=0.95, 
+        edgecolor='#E2E8F0'
+    )
+    ax.set_title('Global Smart Water Meter Market Share by Region (2024)\nScope: Hardware, Software & Services | Source: CMR R-101', fontsize=9, fontweight='bold', pad=8, color='#0F172A')
     p1 = os.path.join(output_dir, "r101_regional_share.png")
-    plt.savefig(p1)
+    plt.savefig(p1, bbox_inches='tight')
     plt.close()
     chart_paths["r101_regional"] = p1
 
     # Chart 1B: Multi-Line Trajectory with Shaded Area (Global vs APAC 2024-2030)
-    fig, ax = plt.subplots(figsize=(6, 3.2), dpi=200)
+    fig, ax = plt.subplots(figsize=(6.5, 3.0), dpi=200)
     years = np.array([2024, 2025, 2026, 2027, 2028, 2029, 2030])
     global_rev = 4.21 * ((1 + 0.112) ** (years - 2024))
     apac_rev = 1.60 * ((1 + 0.129) ** (years - 2024))
@@ -75,14 +89,13 @@ def generate_all_charts(output_dir: str = "data/charts"):
         if y in [2024, 2027, 2030]:
             ax.annotate(f'${g:.2f}B', (y, g), textcoords="offset points", xytext=(0, 6), ha='center', fontsize=7.5, fontweight='bold', color='#1E3A8A')
             ax.annotate(f'${a:.2f}B', (y, a), textcoords="offset points", xytext=(0, -12), ha='center', fontsize=7.5, fontweight='bold', color='#2563EB')
-    plt.tight_layout()
     p2 = os.path.join(output_dir, "r101_market_growth.png")
-    plt.savefig(p2)
+    plt.savefig(p2, bbox_inches='tight')
     plt.close()
     chart_paths["r101_growth"] = p2
 
     # Chart 1C: 100% Stacked Bar Chart (Hardware vs Software vs Services Evolution)
-    fig, ax = plt.subplots(figsize=(6, 3.2), dpi=200)
+    fig, ax = plt.subplots(figsize=(6.5, 3.0), dpi=200)
     periods = ['2024 (Base)', '2026 (Mid)', '2028 (Exp)', '2030 (Target)']
     hw_pct = np.array([58.2, 53.0, 48.5, 45.0])
     sw_pct = np.array([22.1, 26.5, 30.5, 34.2])
@@ -101,9 +114,8 @@ def generate_all_charts(output_dir: str = "data/charts"):
         ax.text(idx, h/2, f'{h:.1f}%', ha='center', va='center', color='white', fontweight='bold', fontsize=7.5)
         ax.text(idx, h + s/2, f'{s:.1f}%', ha='center', va='center', color='white', fontweight='bold', fontsize=7.5)
         ax.text(idx, h + s + v/2, f'{v:.1f}%', ha='center', va='center', color='#0F172A', fontweight='bold', fontsize=7.5)
-    plt.tight_layout()
     p1c = os.path.join(output_dir, "r101_stack_evolution.png")
-    plt.savefig(p1c)
+    plt.savefig(p1c, bbox_inches='tight')
     plt.close()
     chart_paths["r101_stack"] = p1c
 
@@ -112,7 +124,7 @@ def generate_all_charts(output_dir: str = "data/charts"):
     # =========================================================================
     
     # Chart 2A: Horizontal Bar Chart of Hardware Revenue by Region
-    fig, ax = plt.subplots(figsize=(6, 3.2), dpi=200)
+    fig, ax = plt.subplots(figsize=(6.5, 3.0), dpi=200)
     hw_regions = ['APAC (41.0%)', 'North America (30.5%)', 'Europe (21.5%)', 'RoW (7.0%)']
     hw_vals = [1.59, 1.18, 0.83, 0.27]
     colors_hw = ['#065F46', '#059669', '#34D399', '#9CA3AF']
@@ -126,14 +138,13 @@ def generate_all_charts(output_dir: str = "data/charts"):
         ax.annotate(f'${w:.2f}B', xy=(w, bar.get_y() + bar.get_height() / 2),
                     xytext=(5, 0), textcoords="offset points", ha='left', va='center', fontsize=7.5, fontweight='bold', color='#0F172A')
     ax.set_xlim(0, 1.9)
-    plt.tight_layout()
     p3 = os.path.join(output_dir, "r102_hardware_share.png")
-    plt.savefig(p3)
+    plt.savefig(p3, bbox_inches='tight')
     plt.close()
     chart_paths["r102_hardware"] = p3
 
     # Chart 2B: Line Chart showing Component Cost Erosion (Ultrasonic vs Mechanical)
-    fig, ax = plt.subplots(figsize=(6, 3.2), dpi=200)
+    fig, ax = plt.subplots(figsize=(6.5, 3.0), dpi=200)
     timeline = np.array([2020, 2021, 2022, 2023, 2024, 2025])
     ultrasonic_cost = [82, 74, 66, 58, 52, 47]
     mechanical_cost = [42, 43, 45, 46, 46, 47]
@@ -150,9 +161,8 @@ def generate_all_charts(output_dir: str = "data/charts"):
         if x in [2020, 2023, 2025]:
             ax.annotate(f'${u}', (x, u), textcoords="offset points", xytext=(0, 5), ha='center', fontsize=7.2, fontweight='bold', color='#047857')
             ax.annotate(f'${m}', (x, m), textcoords="offset points", xytext=(0, -11), ha='center', fontsize=7.2, fontweight='bold', color='#B45309')
-    plt.tight_layout()
     p2b = os.path.join(output_dir, "r102_cost_parity.png")
-    plt.savefig(p2b)
+    plt.savefig(p2b, bbox_inches='tight')
     plt.close()
     chart_paths["r102_parity"] = p2b
 
@@ -160,25 +170,47 @@ def generate_all_charts(output_dir: str = "data/charts"):
     # 3. R-103: RESIDENTIAL WATER PURIFIERS
     # =========================================================================
     
-    # Chart 3A: Donut Chart
-    fig, ax = plt.subplots(figsize=(6, 3.2), dpi=200)
-    techs = ['Reverse Osmosis (RO)', 'UV Purification', 'Ultrafiltration (UF)', 'Gravity / Carbon Filters']
+    # Chart 3A: Donut Chart with Side Legend
+    fig, ax = plt.subplots(figsize=(6.5, 3.0), dpi=200)
+    techs = ['Reverse Osmosis (RO)', 'UV Purification', 'Ultrafiltration (UF)', 'Gravity & Carbon']
     tech_shares = [52.4, 24.6, 13.8, 9.2]
-    colors_purifier = ['#0284C7', '#38BDF8', '#7DD3FC', '#CBD5E1']
-    ax.pie(tech_shares, labels=techs, autopct='%1.1f%%', startangle=120, colors=colors_purifier,
-           wedgeprops=dict(width=0.45, edgecolor='white', linewidth=2),
-           textprops={'fontsize': 8, 'color': '#1E293B'})
-    ax.set_title('Global Residential Water Purifier Market by Technology (2024)\n2024 Base: USD 9.85B | CAGR: 8.9% | Source: CMR R-103', fontsize=9, fontweight='bold', color='#0369A1')
-    plt.tight_layout()
+    colors_purifier = ['#0369A1', '#0284C7', '#38BDF8', '#7DD3FC']
+    
+    wedges, texts, autotexts = ax.pie(
+        tech_shares, 
+        autopct='%1.1f%%', 
+        startangle=120, 
+        colors=colors_purifier,
+        pctdistance=0.72,
+        wedgeprops=dict(width=0.42, edgecolor='white', linewidth=2)
+    )
+    for at in autotexts:
+        at.set_fontsize(8)
+        at.set_weight('bold')
+        at.set_color('white')
+        
+    legend_tech = [f'{t}: {s}%' for t, s in zip(techs, tech_shares)]
+    ax.legend(
+        wedges, legend_tech,
+        title='Filtration Tech',
+        loc='center left',
+        bbox_to_anchor=(0.95, 0.5),
+        fontsize=8,
+        title_fontsize=8.5,
+        frameon=True,
+        framealpha=0.95,
+        edgecolor='#E2E8F0'
+    )
+    ax.set_title('Global Residential Water Purifier Market by Technology (2024)\n2024 Base: USD 9.85B | CAGR: 8.9% | Source: CMR R-103', fontsize=9, fontweight='bold', pad=8, color='#0369A1')
     p4 = os.path.join(output_dir, "r103_tech_share.png")
-    plt.savefig(p4)
+    plt.savefig(p4, bbox_inches='tight')
     plt.close()
     chart_paths["r103_tech"] = p4
 
     # Chart 3B: Radar / Spider Chart (RO vs UV vs UF Technical Comparison)
-    fig = plt.figure(figsize=(6, 3.2), dpi=200)
+    fig = plt.figure(figsize=(6.5, 3.2), dpi=200)
     ax = fig.add_subplot(111, polar=True)
-    categories = ['TDS Removal', 'Microbial Kill', 'Flow Rate', 'Energy Efficiency', 'Zero Water Waste']
+    categories = ['TDS Removal', 'Microbial Kill', 'Flow Rate', 'Energy Efficiency', 'Zero Waste']
     N = len(categories)
     angles = [n / float(N) * 2 * np.pi for n in range(N)]
     angles += angles[:1]
@@ -200,11 +232,10 @@ def generate_all_charts(output_dir: str = "data/charts"):
     ax.set_xticks(angles[:-1])
     ax.set_xticklabels(categories, fontsize=7.5, fontweight='bold', color='#1E293B')
     ax.set_ylim(0, 10)
-    ax.set_title('Filtration Technology Multi-Attribute Comparison Matrix\nScale: 1-10 Benchmark | Source: CMR R-103', fontsize=8.5, fontweight='bold', pad=14, color='#0369A1')
-    ax.legend(loc='upper right', bbox_to_anchor=(1.25, 1.15), fontsize=6.8)
-    plt.tight_layout()
+    ax.set_title('Filtration Technology Multi-Attribute Comparison Matrix\nScale: 1-10 Benchmark | Source: CMR R-103', fontsize=8.5, fontweight='bold', pad=12, color='#0369A1')
+    ax.legend(loc='upper right', bbox_to_anchor=(1.32, 1.12), fontsize=7.0, framealpha=0.9)
     p3b = os.path.join(output_dir, "r103_radar_matrix.png")
-    plt.savefig(p3b)
+    plt.savefig(p3b, bbox_inches='tight')
     plt.close()
     chart_paths["r103_radar"] = p3b
 
@@ -213,7 +244,7 @@ def generate_all_charts(output_dir: str = "data/charts"):
     # =========================================================================
     
     # Chart 4A: Grouped Side-by-Side Bar Chart (2024 Base vs 2030 Projected Capex)
-    fig, ax = plt.subplots(figsize=(6, 3.2), dpi=200)
+    fig, ax = plt.subplots(figsize=(6.5, 3.0), dpi=200)
     sectors = ['Pharma/Bio', 'Power Gen', 'Food & Bev', 'Chemicals', 'Desalination']
     base_2024 = [4.54, 3.41, 2.84, 1.99, 1.42]
     proj_2030 = [7.12, 5.15, 4.38, 3.01, 2.24]
@@ -236,9 +267,8 @@ def generate_all_charts(output_dir: str = "data/charts"):
         h = bar.get_height()
         ax.annotate(f'${h:.1f}', (bar.get_x() + bar.get_width()/2, h), xytext=(0, 3), textcoords="offset points", ha='center', fontsize=7, fontweight='bold', color='#4C1D95')
     ax.set_ylim(0, 8.5)
-    plt.tight_layout()
     p5 = os.path.join(output_dir, "r104_industrial_spend.png")
-    plt.savefig(p5)
+    plt.savefig(p5, bbox_inches='tight')
     plt.close()
     chart_paths["r104_spend"] = p5
 
@@ -246,24 +276,40 @@ def generate_all_charts(output_dir: str = "data/charts"):
     # 5. R-105: SMART MULTI-UTILITY METERING
     # =========================================================================
     
-    # Chart 5A: Pie/Donut Chart
-    fig, ax = plt.subplots(figsize=(6, 3.2), dpi=200)
+    # Chart 5A: Pie/Donut Chart with Side Legend
+    fig, ax = plt.subplots(figsize=(6.5, 3.0), dpi=200)
     utilities = ['Electricity AMI', 'Smart Water Meters', 'Gas AMI Endpoints']
     endpoint_shares = [62.0, 26.0, 12.0]
-    colors_multi = ['#D97706', '#F59E0B', '#FCD34D']
+    colors_multi = ['#92400E', '#D97706', '#F59E0B']
+    
     wedges, texts, autotexts = ax.pie(
-        endpoint_shares, labels=utilities, autopct='%1.1f%%',
-        startangle=90, colors=colors_multi,
-        wedgeprops=dict(width=0.45, edgecolor='white', linewidth=2),
-        textprops={'fontsize': 8.5, 'color': '#1E293B'}
+        endpoint_shares, 
+        autopct='%1.1f%%',
+        startangle=90, 
+        colors=colors_multi,
+        pctdistance=0.72,
+        wedgeprops=dict(width=0.42, edgecolor='white', linewidth=2)
     )
     for at in autotexts:
         at.set_weight('bold')
         at.set_color('white')
-    ax.set_title('Multi-Utility Smart Metering Infrastructure Shipments (2024)\nTotal Multi-Grid Market: USD 11.50B | Source: Apex Grid R-105', fontsize=9, fontweight='bold', color='#92400E')
-    plt.tight_layout()
+        at.set_fontsize(8)
+        
+    legend_util = [f'{u}: {s}%' for u, s in zip(utilities, endpoint_shares)]
+    ax.legend(
+        wedges, legend_util,
+        title='Utility Segment',
+        loc='center left',
+        bbox_to_anchor=(0.95, 0.5),
+        fontsize=8,
+        title_fontsize=8.5,
+        frameon=True,
+        framealpha=0.95,
+        edgecolor='#E2E8F0'
+    )
+    ax.set_title('Multi-Utility Smart Metering Infrastructure Shipments (2024)\nTotal Multi-Grid Market: USD 11.50B | Source: Apex Grid R-105', fontsize=9, fontweight='bold', pad=8, color='#92400E')
     p6 = os.path.join(output_dir, "r105_utility_mix.png")
-    plt.savefig(p6)
+    plt.savefig(p6, bbox_inches='tight')
     plt.close()
     chart_paths["r105_mix"] = p6
 
@@ -272,7 +318,7 @@ def generate_all_charts(output_dir: str = "data/charts"):
     # =========================================================================
     
     # Chart 6A: Dual-Axis Line + Bar Chart (Market Volume vs YoY Growth Rate)
-    fig, ax1 = plt.subplots(figsize=(6, 3.2), dpi=200)
+    fig, ax1 = plt.subplots(figsize=(6.5, 3.0), dpi=200)
     years_w = ['2024', '2025', '2026', '2027', '2028', '2029', '2030']
     base_w = 7.60
     cagr_w = 0.125
@@ -298,9 +344,8 @@ def generate_all_charts(output_dir: str = "data/charts"):
         ax2.annotate(f'{gr:.1f}%', (yr, gr), xytext=(0, 5), textcoords="offset points", ha='center', fontsize=6.8, fontweight='bold', color=color_line)
 
     ax1.set_title('Decentralized Wastewater Treatment: Sizing & YoY Growth\nDual-Axis Valuation & Growth Dynamics | Source: CMR R-106', fontsize=8.8, fontweight='bold', color='#134E4A')
-    plt.tight_layout()
     p7 = os.path.join(output_dir, "r106_wastewater_growth.png")
-    plt.savefig(p7)
+    plt.savefig(p7, bbox_inches='tight')
     plt.close()
     chart_paths["r106_growth"] = p7
 
