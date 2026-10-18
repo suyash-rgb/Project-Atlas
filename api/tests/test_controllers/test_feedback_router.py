@@ -1,3 +1,6 @@
+from unittest.mock import patch
+
+
 class TestFeedbackRouter:
     def test_feedback_without_auth_returns_403(self, client):
         response = client.post(
@@ -6,7 +9,11 @@ class TestFeedbackRouter:
         )
         assert response.status_code == 403
 
-    def test_feedback_valid_payload_returns_201_created(self, client, auth_headers):
+    @patch(
+        "app.api.v1.routers.feedback.feedback_service.record_feedback",
+        return_value={"status": "success", "message": "Feedback recorded."},
+    )
+    def test_feedback_valid_payload_returns_201_created(self, _record_feedback, client, auth_headers):
         response = client.post(
             "/api/v1/feedback",
             json={

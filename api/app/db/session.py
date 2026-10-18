@@ -1,17 +1,29 @@
-import os
-import sqlite3
-from typing import Generator
+import mysql.connector
+from mysql.connector.connection import MySQLConnection
 from app.core.config import settings
 
-# Canonical absolute path to SQLite database
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../project_atlas.db"))
 
+def get_db_connection(*, readonly: bool = False) -> MySQLConnection:
+    """
+    Open a transaction-capable MySQL connection with the requested DB role.
+    """
+    if readonly:
+        username = settings.MYSQL_READONLY_USER
+        password = settings.MYSQL_READONLY_PASSWORD
+        role = "read-only"
+    else:
+        username = settings.MYSQL_USER
+        password = settings.MYSQL_PASSWORD
+        role = "read-write"
 
-def get_db_connection() -> sqlite3.Connection:
-    """
-    Creates and returns a connection to the SQLite database.
-    Configures row_factory for dict-like access.
-    """
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    if not username or not password:
+        raise RuntimeError(f"MySQL {role} credentials are not configured.")
+
+    return mysql.connector.connect(
+        host=settings.MYSQL_HOST,
+        port=settings.MYSQL_PORT,
+        database=settings.MYSQL_DATABASE,
+        user=username,
+        password=password,
+        autocommit=False,
+    )

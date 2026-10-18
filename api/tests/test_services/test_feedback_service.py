@@ -1,36 +1,61 @@
+from importlib import import_module
+from unittest.mock import Mock
+
 import pytest
-from app.services.feedback_service import FeedbackService
+
 from app.schemas.chat import FeedbackResponse
+from app.services.feedback_service import FeedbackService
+
+feedback_module = import_module("app.services.feedback_service")
 
 
-class TestFeedbackService:
-    def setup_method(self):
-        self.service = FeedbackService()
+def test_record_feedback_commits_to_shared_write_connection(monkeypatch):
+    connection = Mock()
+    cursor = connection.cursor.return_value
+    monkeypatch.setattr(feedback_module, "get_db_connection", lambda: connection)
 
-    def test_record_feedback_up_success(self):
-        res = self.service.record_feedback(
-            client_id="C-01",
-            rating="up",
-            message_id="msg_test_01",
-            comment="Accurate citation"
-        )
-        assert isinstance(res, FeedbackResponse)
-        assert res.status == "success"
-        assert res.message == "Feedback recorded."
+    result = FeedbackService().record_feedback(
+        client_id=" C-01 ",
+        rating="UP",
+        message_id="msg-1",
+        comment="Useful answer",
+    )
 
-    def test_record_feedback_down_success(self):
-        res = self.service.record_feedback(
-            client_id="C-02",
-            rating="DOWN",  # Tests case normalization
-            message_id="msg_test_02",
-            comment="Scope difference needed more details"
-        )
-        assert res.status == "success"
+    assert isinstance(result, FeedbackResponse)
+    assert result.status == "success"
+    connection.start_transaction.assert_called_once()
+    cursor.execute.assert_called_once_with(
+        "INSERT INTO feedback (client_id, message_id, rating, comment) "
+        "VALUES (%s, %s, %s, %s)",
+        ("C-01", "msg-1", "up", "Useful answer"),
+    )
+    connection.commit.assert_called_once()
+    connection.rollback.assert_not_called()
+    cursor.close.assert_called_once()
+    connection.close.assert_called_once()
 
-    def test_empty_client_id_raises_value_error(self):
-        with pytest.raises(ValueError, match="client_id is required"):
-            self.service.record_feedback(client_id="", rating="up")
 
-    def test_invalid_rating_raises_value_error(self):
-        with pytest.raises(ValueError, match="Invalid rating 'neutral'"):
-            self.service.record_feedback(client_id="C-01", rating="neutral")
+def test_record_feedback_rolls_back_write_failure(monkeypatch):
+    connection = Mock()
+    connection.cursor.return_value.execute.side_effect = RuntimeError("write failed")
+    monkeypatch.setattr(feedback_module, "get_db_connection", lambda: connection)
+
+    with pytest.raises(RuntimeError, match="Failed to persist feedback") as error:
+        FeedbackService().record_feedback(client_id="C-01", rating="up")
+
+    assert isinstance(error.value.__cause__, RuntimeError)
+    connection.start_transaction.assert_called_once()
+    connection.rollback.assert_called_once()
+    connection.commit.assert_not_called()
+    connection.cursor.return_value.close.assert_called_once()
+    connection.close.assert_called_once()
+
+
+def test_empty_client_id_raises_value_error():
+    with pytest.raises(ValueError, match="client_id is required"):
+        FeedbackService().record_feedback(client_id="", rating="up")
+
+
+def test_invalid_rating_raises_value_error():
+    with pytest.raises(ValueError, match="Invalid rating 'neutral'"):
+        FeedbackService().record_feedback(client_id="C-01", rating="neutral")

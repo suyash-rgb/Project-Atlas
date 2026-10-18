@@ -1,4 +1,5 @@
 import pytest
+from unittest.mock import patch
 from app.core.telemetry import TelemetryManager, QueryResponseCache, LangfuseBridge
 from app.schemas.chat import ChatResponse
 
@@ -53,11 +54,17 @@ class TestTelemetry:
         assert metrics["total_requests"] == 2
         assert metrics["cache_hit_rate"] == "50.0%"
         assert metrics["total_tokens_consumed"] == 550
-        assert metrics["langfuse_enabled"] is False
+        assert metrics["langfuse_enabled"] is self.mgr.langfuse.enabled
         assert metrics["storage_footprint_mb"] == 0.0
 
     def test_langfuse_bridge_safe_when_unconfigured(self):
-        bridge = LangfuseBridge()
+        with patch("app.core.telemetry.settings.LANGFUSE_PUBLIC_KEY", None), \
+             patch("app.core.telemetry.settings.LANGFUSE_SECRET_KEY", None), \
+             patch.dict("os.environ", {
+                 "LANGFUSE_PUBLIC_KEY": "",
+                 "LANGFUSE_SECRET_KEY": "",
+             }):
+            bridge = LangfuseBridge()
         assert bridge.enabled is False
         # Calling log_trace without credentials should not raise
         bridge.log_trace(

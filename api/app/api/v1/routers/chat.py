@@ -24,6 +24,10 @@ router = APIRouter(prefix="/chat", tags=["Chat & Agent Copilot"])
             "model": ErrorResponse,
             "description": "Forbidden - invalid or missing X-API-Key"
         },
+        503: {
+            "model": ErrorResponse,
+            "description": "Service Unavailable - API authentication is not configured"
+        },
         500: {
             "model": ErrorResponse,
             "description": "Internal Server Error - agent workflow execution failure"

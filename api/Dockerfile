@@ -12,12 +12,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt /app/
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code, local models, database, and configurations
+# Copy application code, local models, and data
 COPY api/app /app/app
 COPY models /app/models
 COPY data /app/data
-COPY project_atlas.db /app/project_atlas.db
-COPY .env /app/.env
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1

@@ -1,7 +1,19 @@
 """Langfuse observation helpers shared by the agent pipeline."""
 
 from functools import wraps
-from typing import Callable, ParamSpec, TypeVar
+from typing import Callable, Literal, ParamSpec, TypeVar
+
+ObservationType = Literal[
+    "generation",
+    "span",
+    "agent",
+    "tool",
+    "chain",
+    "retriever",
+    "embedding",
+    "evaluator",
+    "guardrail",
+]
 
 try:
     from langfuse import observe, propagate_attributes
@@ -17,7 +29,7 @@ def observe_with_tags(
     *,
     name: str,
     tags: list[str],
-    as_type: str = "tool",
+    as_type: ObservationType = "tool",
 ) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Create a typed Langfuse observation and propagate its trace tags."""
     def decorator(func: Callable[P, R]) -> Callable[P, R]:

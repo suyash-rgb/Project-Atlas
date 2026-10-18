@@ -5,6 +5,7 @@ Detects methodological, scope, and forecast window divergences between reports
 """
 
 from typing import List, Optional
+import re
 from app.schemas.chat import ConflictItem
 from app.agent.tools.retriever import RetrievedChunk
 from app.core.observability import observe_with_tags
@@ -27,11 +28,13 @@ def detect_report_conflicts(
     # Check for R-101 vs R-102 conflict
     # Triggers if both reports are present, or if query explicitly mentions both or asks about discrepancy
     query_lower = query.lower()
-    mentions_both = ("r-101" in query_lower or "101" in query_lower) and ("r-102" in query_lower or "102" in query_lower)
+    mentions_both = (
+        re.search(r"(?<!\d)(?:r-?)?101(?!\d)", query_lower) is not None
+        and re.search(r"(?<!\d)(?:r-?)?102(?!\d)", query_lower) is not None
+    )
     chunks_have_both = ("R-101" in report_ids and "R-102" in report_ids)
-    discrepancy_intent = any(k in query_lower for k in ["conflict", "discrepancy", "difference", "compare", "trust", "why does", "versus", "vs"])
 
-    if (mentions_both or chunks_have_both) and (discrepancy_intent or mentions_both or chunks_have_both):
+    if mentions_both or chunks_have_both:
         conflicts.append(
             ConflictItem(
                 metric="Global Market Size (2024) & Projected CAGR",

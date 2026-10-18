@@ -24,6 +24,10 @@ router = APIRouter(prefix="/feedback", tags=["Feedback & Analytics"])
             "model": ErrorResponse,
             "description": "Forbidden - invalid or missing X-API-Key"
         },
+        503: {
+            "model": ErrorResponse,
+            "description": "Service Unavailable - API authentication is not configured"
+        },
         500: {
             "model": ErrorResponse,
             "description": "Internal Server Error - database write failure"

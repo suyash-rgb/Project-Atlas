@@ -9,6 +9,19 @@ class TestChatRouter:
         data = response.json()
         assert "Invalid or missing API Key" in data["detail"]
 
+    def test_chat_returns_503_when_api_key_is_not_configured(self, client, monkeypatch):
+        from app.core.config import settings
+
+        monkeypatch.setattr(settings, "API_KEY", None)
+        response = client.post(
+            "/api/v1/chat",
+            json={"client_id": "C-01", "question": "test"},
+            headers={"X-API-Key": "pytest-only-api-key"},
+        )
+
+        assert response.status_code == 503
+        assert response.json()["detail"] == "API authentication is not configured"
+
     def test_chat_with_empty_question_returns_400(self, client, auth_headers):
         response = client.post(
             "/api/v1/chat",

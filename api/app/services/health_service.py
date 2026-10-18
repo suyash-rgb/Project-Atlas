@@ -1,8 +1,11 @@
-import os
+import logging
+
 from app.core.config import settings
-from app.db.session import DB_PATH
+from app.db.session import get_db_connection
 from app.schemas.chat import HealthResponse
 from app.agent.tools.retriever import get_retriever
+
+logger = logging.getLogger(__name__)
 
 
 class HealthService:
@@ -15,8 +18,21 @@ class HealthService:
         Executes diagnostic probes across DB, vector index, and runtime environment.
         Determines whether the service is fully healthy or degraded.
         """
-        db_exists = os.path.exists(DB_PATH)
-        db_status = "connected" if db_exists else "not_found"
+        db_connected = False
+        try:
+            conn = get_db_connection(readonly=True)
+            cursor = conn.cursor()
+            try:
+                cursor.execute("SELECT 1")
+                db_connected = cursor.fetchone() is not None
+            finally:
+                cursor.close()
+                conn.close()
+        except Exception as exc:
+            logger.warning("MySQL readiness probe failed: %s", exc)
+            db_connected = False
+
+        db_status = "connected" if db_connected else "unavailable"
 
         vector_ok = False
         try:
@@ -27,7 +43,7 @@ class HealthService:
         except Exception as e:
             v_status = f"error: {str(e)}"
 
-        overall_status = "healthy" if (db_exists and vector_ok) else "degraded"
+        overall_status = "healthy" if (db_connected and vector_ok) else "degraded"
 
         return HealthResponse(
             status=overall_status,

@@ -7,20 +7,38 @@ services:
     container_name: atlas_mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
       MYSQL_DATABASE: project_atlas
-      MYSQL_USER: atlas_user
-      MYSQL_PASSWORD: atlas_password
     ports:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "atlas_user", "-patlas_password"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - atlas_network
+
+  db-roles:
+    image: mysql:8.0
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/scripts/create-readonly-user.sh"]
+    environment:
+      MYSQL_HOST: db
+      MYSQL_DATABASE: project_atlas
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_READONLY_USER: ${MYSQL_READONLY_USER:?Set MYSQL_READONLY_USER in .env}
+      MYSQL_READONLY_PASSWORD: ${MYSQL_READONLY_PASSWORD:?Set MYSQL_READONLY_PASSWORD in .env}
+    volumes:
+      - ./docker/mysql/create-readonly-user.sh:/scripts/create-readonly-user.sh:ro
     networks:
       - atlas_network
 
@@ -34,28 +52,29 @@ services:
     container_name: atlas_api
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      db-roles:
+        condition: service_completed_successfully
     ports:
       - "8000:8000"
       - "8888:8000"
     environment:
-      - MYSQL_HOST=db
-      - MYSQL_PORT=3306
-      - MYSQL_DATABASE=project_atlas
-      - MYSQL_USER=atlas_user
-      - MYSQL_PASSWORD=atlas_password
-      - MYSQL_READONLY_USER=atlas_readonly
-      - MYSQL_READONLY_PASSWORD=atlas_readonly_password
-      - API_KEY=atlas_dev_secret_key
-      - GROQ_API_KEY=${GROQ_API_KEY}
-      - GROQ_MODEL=${GROQ_MODEL:-openai/gpt-oss-20b}
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - HF_HOME=/app/data/.cache/huggingface
+      API_KEY: ${API_KEY:?Set API_KEY in .env}
+      GROQ_API_KEY: ${GROQ_API_KEY:?Set GROQ_API_KEY in .env}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: project_atlas
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_READONLY_USER: ${MYSQL_READONLY_USER:?Set MYSQL_READONLY_USER in .env}
+      MYSQL_READONLY_PASSWORD: ${MYSQL_READONLY_PASSWORD:?Set MYSQL_READONLY_PASSWORD in .env}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+      HF_HOME: /app/data/.cache/huggingface
     volumes:
       - ./models:/app/models
       - ./data:/app/data
-      - ./project_atlas.db:/app/project_atlas.db
     networks:
       - atlas_network
 
@@ -69,17 +88,20 @@ services:
     container_name: atlas_portal
     restart: unless-stopped
     depends_on:
-      - api
-      - db
+      api:
+        condition: service_started
+      db-roles:
+        condition: service_completed_successfully
     ports:
       - "8080:80"
     environment:
-      - FASTAPI_URL=http://api:8000
-      - ATLAS_API_KEY=atlas_dev_secret_key
-      - DB_HOST=db
-      - DB_USER=atlas_user
-      - DB_PASS=atlas_password
-      - DB_NAME=project_atlas
+      FASTAPI_URL: ${FASTAPI_URL:?Set FASTAPI_URL in .env}
+      ATLAS_API_KEY: ${API_KEY:?Set API_KEY in .env}
+      DB_HOST: ${DB_HOST:?Set DB_HOST in .env}
+      DB_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
+      DB_PASS: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      DB_NAME: project_atlas
+      DB_PORT: 3306
     networks:
       - atlas_network
 

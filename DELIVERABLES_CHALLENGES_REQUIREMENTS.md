@@ -39,10 +39,11 @@ Every single functional and non-functional requirement explicitly defined in `AI
 - [x] **Semantic Chunking & Metadata Preservation:** Chunked via `SentenceSplitter(chunk_size=512, chunk_overlap=64)` while preserving `report_id`, `page`, `sector`, `year`, `publisher`, and `access` with every chunk.
 
 ### B. Storage, Relational Schema & Vector Database
-- [x] **Relational Schema (MySQL 8.0 & SQLite):** Complete tables for `reports`, `market_metrics`, `clients`, `escalations`, and `feedback`.
+- [x] **Relational Schema (Shared MySQL 8.0):** Complete tables for `reports`, `market_metrics`, `clients`, `escalations`, and `feedback`, shared by FastAPI and the CI3 portal.
+- [x] **Database Role Separation:** Application writes use a read-write account with explicit transactions; agent-generated SQL uses a separate SELECT-only account.
 - [x] **Vector Database:** ChromaDB vector store embedded with FastEmbed `BAAI/bge-small-en-v1.5` ONNX embeddings (37 distinct chunks indexed).
 - [x] **Entitlement-Filtered Search:** Vector search queries enforce strict metadata filters (`report_id IN allowed_reports`) at database query time, preventing unentitled chunks from ever reaching LLM context.
-- [x] **Zero Mock Data:** All queries run against live SQLite/MySQL databases and ChromaDB collections.
+- [x] **Production Data Path:** Application database queries use the shared MySQL database; automated tests mock connections by default, with an opt-in MySQL privilege integration test.
 
 ### C. Agent Architecture & Orchestration
 - [x] **LangGraph State Machine Engine:** Multi-node cyclic workflow managing query state, confidence scores, conflict items, and derived projections (`api/app/agent/graph.py`).
@@ -173,7 +174,7 @@ Every single functional and non-functional requirement explicitly defined in `AI
 ### Challenge 5: Authentication & Session Sharing (Cookie/File vs JWT)
 - **The Problem:** CI3 uses cookie/file-based PHP sessions, while FastAPI operates statelessly via HTTP Bearer tokens and API keys.
 - **The Implemented Workaround:**
-  1. Implemented mutual API key authentication (`X-API-Key: atlas-secret-key-2025`) between CI3 and FastAPI.
+  1. Implemented mutual API key authentication via the server-side `API_KEY` environment variable between CI3 and FastAPI. The key must not be embedded in browser code or committed files.
   2. For enterprise deployments, documented the AWS ElastiCache / Redis session bridge where CI3 issues signed JWTs that FastAPI verifies statelessly.
 
 ### Challenge 6: Cloud Infrastructure & Routing Architecture (AWS Deployment)
@@ -187,8 +188,8 @@ Every single functional and non-functional requirement explicitly defined in `AI
 ### Challenge 7: Windows Host Port Conflict (Microsoft `cvss.exe` on Port 8000)
 - **The Problem:** On Windows host environments, Microsoft's background compliance service (`cvss.exe`) binds ports `8000` and `8001`, causing `[Errno 10048] address already in use` when launching `uvicorn`.
 - **The Implemented Workaround:**
-  1. Assigned the local FastAPI development server to port **`8888`** (`http://127.0.0.1:8888`), leaving port `8080` for the portal preview.
-  2. Configured `docker-compose.yml` with container bridge networking (`http://api:8000`), ensuring host Windows port conflicts have zero impact on Docker deployments.
+  1. Configured the FastAPI origin through the server-side `FASTAPI_URL` environment variable, keeping the backend address out of browser code.
+  2. The CI3 portal proxies browser requests through its own controller and forwards them to FastAPI with the server-side `ATLAS_API_KEY`.
 
 ### Challenge 8: Local C: Drive Disk Space Exhaustion
 - **The Problem:** Hugging Face model caches (`~/.cache/huggingface/hub`) and pip wheel caches accumulated on the Windows `C:` drive, dropping free space to a critical 0.37 GB.

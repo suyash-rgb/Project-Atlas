@@ -4,21 +4,15 @@ Generates strictly grounded executive market answers with in-text citations [R-X
 reconciles methodology discrepancies, and constructs typed ChatResponse objects.
 """
 
-import os
 import re
 import json
 from typing import List, Optional, Dict, Any
-from dotenv import load_dotenv
 import groq
 
 from app.schemas.chat import ChatResponse, ConflictItem, DerivedValueItem
 from app.agent.tools.retriever import RetrievedChunk
+from app.core.config import settings
 from app.core.observability import observe_with_tags
-
-load_dotenv()
-
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 
 SYSTEM_PROMPT = """You are the Senior Research Intelligence Copilot for Cognitive Market Research (Project Atlas).
 You provide clear, authoritative, executive market summaries to enterprise clients.
@@ -52,10 +46,10 @@ def extract_citations(text: str) -> List[str]:
 
 class LLMSynthesizer:
     def __init__(self):
-        if not GROQ_API_KEY:
+        if not settings.GROQ_API_KEY:
             raise ValueError("GROQ_API_KEY not configured in environment.")
-        self.client = groq.Groq(api_key=GROQ_API_KEY)
-        self.model = GROQ_MODEL
+        self.client = groq.Groq(api_key=settings.GROQ_API_KEY)
+        self.model = settings.GROQ_MODEL
 
     @observe_with_tags(
         name="llm_synthesizer",

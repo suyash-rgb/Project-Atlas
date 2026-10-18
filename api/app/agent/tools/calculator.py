@@ -15,8 +15,10 @@ def compute_cagr(start_val: float, end_val: float, periods: float) -> float:
     CAGR = (End / Start) ** (1 / n) - 1
     Returns decimal percentage (e.g., 0.112 for 11.2%)
     """
-    if start_val <= 0 or periods <= 0:
-        raise ValueError("Start value and periods must be positive.")
+    if not all(math.isfinite(value) for value in (start_val, end_val, periods)):
+        raise ValueError("Start value, end value, and periods must be finite.")
+    if start_val <= 0 or end_val <= 0 or periods <= 0:
+        raise ValueError("Start value, end value, and periods must be positive.")
     return (end_val / start_val) ** (1.0 / periods) - 1.0
 
 
@@ -24,6 +26,12 @@ def compute_future_value(base_val: float, cagr: float, periods: float) -> float:
     """
     V_end = V_start * ((1 + CAGR) ** n)
     """
+    if not all(math.isfinite(value) for value in (base_val, cagr, periods)):
+        raise ValueError("Base value, CAGR, and periods must be finite.")
+    if base_val <= 0:
+        raise ValueError("Base value must be positive.")
+    if cagr <= -1:
+        raise ValueError("CAGR must be greater than -1.")
     if periods < 0:
         raise ValueError("Periods must be non-negative.")
     return base_val * ((1.0 + cagr) ** periods)

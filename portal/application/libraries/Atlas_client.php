@@ -16,10 +16,22 @@ class Atlas_client {
 
     public function __construct() {
         $this->CI =& get_instance();
-        
-        // Read configuration from environment or config file
-        $this->api_base_url = getenv('FASTAPI_URL') ? getenv('FASTAPI_URL') : 'http://api:8000';
-        $this->api_key = getenv('ATLAS_API_KEY') ? getenv('ATLAS_API_KEY') : 'atlas_secret_token_2026';
+
+        $this->api_base_url = getenv('FASTAPI_URL');
+        $this->api_key = getenv('ATLAS_API_KEY');
+        if (!$this->api_base_url || !$this->api_key) {
+            throw new RuntimeException('FASTAPI_URL and ATLAS_API_KEY must be configured.');
+        }
+        $url_parts = parse_url($this->api_base_url);
+        if (
+            !filter_var($this->api_base_url, FILTER_VALIDATE_URL)
+            || !is_array($url_parts)
+            || !isset($url_parts['scheme'], $url_parts['host'])
+            || !in_array(strtolower($url_parts['scheme']), array('http', 'https'), true)
+        ) {
+            throw new RuntimeException('FASTAPI_URL must be an absolute HTTP or HTTPS URL.');
+        }
+
         $this->timeout = 30; // 30-second per-request budget per assignment requirements
     }
 
@@ -51,6 +63,14 @@ class Atlas_client {
     private function _send_request($endpoint, $method = 'GET', $data = null) {
         $url = rtrim($this->api_base_url, '/') . $endpoint;
         $ch = curl_init();
+        if ($ch === false) {
+            log_message('error', 'Atlas_client could not initialize cURL.');
+            return array(
+                'status'  => 'error',
+                'code'    => 503,
+                'message' => 'The Report Copilot service is temporarily unavailable.'
+            );
+        }
 
         $headers = array(
             'Content-Type: application/json',
@@ -77,7 +97,7 @@ class Atlas_client {
         curl_close($ch);
 
         if ($response === false) {
-            log_message('error', "Atlas_client cURL failed: {$curl_error} on {$url}");
+            log_message('error', "Atlas_client cURL request failed: {$curl_error}");
             return array(
                 'status'  => 'error',
                 'code'    => 504,
@@ -87,12 +107,11 @@ class Atlas_client {
 
         $decoded = json_decode($response, true);
         if ($http_code >= 400) {
-            log_message('error', "Atlas_client HTTP {$http_code}: {$response}");
+            log_message('error', "Atlas_client received HTTP {$http_code}.");
             return array(
                 'status'  => 'error',
                 'code'    => $http_code,
-                'message' => isset($decoded['detail']) ? $decoded['detail'] : 'Backend processing error.',
-                'raw'     => $decoded
+                'message' => isset($decoded['detail']) ? $decoded['detail'] : 'Backend processing error.'
             );
         }
 

@@ -954,11 +954,10 @@
             const clientId = clientSelect.value;
 
             try {
-                const res = await fetch('http://127.0.0.1:8888/api/v1/chat', {
+                const res = await fetch('/index.php/chat/send', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': 'atlas_dev_secret_key'
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({ client_id: clientId, query: query })
                 });
@@ -977,7 +976,7 @@
                 }
             } catch (err) {
                 appendAssistantResponse({
-                    answer: 'Connection error communicating with the Project Atlas intelligence engine on port 8888.',
+                    answer: 'Connection error communicating with the CodeIgniter portal backend.',
                     confidence: 0.0,
                     escalated: true
                 });
@@ -990,11 +989,10 @@
             const bar = btn.parentElement;
             bar.innerHTML = '<span style="color: var(--cmr-success); font-weight: 600;"><i class="fa-solid fa-check"></i> Thank you! Your feedback has been recorded in our database.</span>';
             try {
-                await fetch('http://127.0.0.1:8888/api/v1/feedback', {
+                await fetch('/index.php/chat/feedback', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'X-API-Key': 'atlas_dev_secret_key'
+                        'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
                         client_id: clientSelect.value,

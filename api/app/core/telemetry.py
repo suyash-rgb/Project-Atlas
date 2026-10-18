@@ -98,16 +98,18 @@ class LangfuseBridge:
     def _init_client(self):
         pub_key = settings.LANGFUSE_PUBLIC_KEY or os.environ.get("LANGFUSE_PUBLIC_KEY")
         sec_key = settings.LANGFUSE_SECRET_KEY or os.environ.get("LANGFUSE_SECRET_KEY")
-        host = settings.LANGFUSE_HOST or os.environ.get("LANGFUSE_HOST", "https://cloud.langfuse.com")
+        host = settings.LANGFUSE_HOST or os.environ.get("LANGFUSE_HOST")
 
         if pub_key and sec_key:
             try:
                 from langfuse import Langfuse
-                self._client = Langfuse(
-                    public_key=pub_key,
-                    secret_key=sec_key,
-                    host=host
-                )
+                client_options = {
+                    "public_key": pub_key,
+                    "secret_key": sec_key,
+                }
+                if host:
+                    client_options["host"] = host
+                self._client = Langfuse(**client_options)
                 self.enabled = True
                 logger.info("Langfuse Cloud observability bridge initialized successfully.")
             except Exception as e:

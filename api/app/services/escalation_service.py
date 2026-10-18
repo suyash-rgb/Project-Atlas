@@ -1,8 +1,6 @@
-import os
-import sqlite3
 from typing import List, Optional
 from datetime import datetime
-from app.db.session import DB_PATH, get_db_connection
+from app.db.session import get_db_connection
 from app.schemas.chat import EscalationItem
 
 
@@ -15,21 +13,19 @@ class EscalationService:
     def get_all_escalations(self, limit: int = 100) -> List[EscalationItem]:
         """
         Retrieves recent escalations ordered by latest timestamp.
-        Gracefully handles date parsing and missing database tables.
         """
-        if not os.path.exists(DB_PATH):
-            return []
-
         conn = get_db_connection()
-        cursor = conn.cursor()
-        cursor.execute(
-            "SELECT id, client_id, question, reason, status, created_at "
-            "FROM escalations ORDER BY id DESC LIMIT ?",
-            (limit,)
-        )
-        rows = cursor.fetchall()
-        cursor.close()
-        conn.close()
+        cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                "SELECT id, client_id, question, reason, status, created_at "
+                "FROM escalations ORDER BY id DESC LIMIT %s",
+                (limit,)
+            )
+            rows = cursor.fetchall()
+        finally:
+            cursor.close()
+            conn.close()
 
         items: List[EscalationItem] = []
         for r in rows:
@@ -67,16 +63,21 @@ class EscalationService:
         """
         conn = get_db_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO escalations (client_id, question, reason, status) "
-            "VALUES (?, ?, ?, ?)",
-            (client_id, question, reason, status)
-        )
-        conn.commit()
-        ticket_id = cursor.lastrowid or 0
-        cursor.close()
-        conn.close()
-        return ticket_id
+        try:
+            conn.start_transaction()
+            cursor.execute(
+                "INSERT INTO escalations (client_id, question, reason, status) "
+                "VALUES (%s, %s, %s, %s)",
+                (client_id, question, reason, status)
+            )
+            conn.commit()
+            return cursor.lastrowid or 0
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            cursor.close()
+            conn.close()
 
 
 escalation_service = EscalationService()

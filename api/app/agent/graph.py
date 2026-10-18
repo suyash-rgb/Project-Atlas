@@ -11,8 +11,6 @@ Orchestrates:
 7. LLM Synthesizer (Executive answers with verified citations)
 """
 
-import os
-import sqlite3
 from typing import List, Dict, Any, Optional
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, END
@@ -22,8 +20,8 @@ from app.agent.router import classify_query, RouterDecision
 from app.agent.tools.sql_tool import (
     execute_safe_sql,
     get_client_entitlements,
-    DB_PATH
 )
+from app.services.escalation_service import escalation_service
 from app.agent.tools.retriever import get_retriever, RetrievedChunk
 from app.agent.tools.calculator import calculate_projection, extract_numbers_from_query
 from app.agent.reconcile import detect_report_conflicts
@@ -49,23 +47,9 @@ class AgentState(TypedDict):
 
 
 def log_escalation_to_db(client_id: str, question: str, reason: str) -> str:
-    """Inserts an escalation record into SQLite and returns ticket identifier."""
-    ticket_id = "ESC-UNKNOWN"
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO escalations (client_id, question, reason, status) VALUES (?, ?, ?, 'pending')",
-            (client_id, question, reason)
-        )
-        conn.commit()
-        last_id = cursor.lastrowid
-        ticket_id = f"ESC-{last_id:04d}"
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        print(f"Failed to log escalation: {e}")
-    return ticket_id
+    """Insert an escalation through the shared transactional service."""
+    ticket_id = escalation_service.log_escalation(client_id, question, reason)
+    return f"ESC-{ticket_id:04d}"
 
 
 # --- Workflow Nodes ---

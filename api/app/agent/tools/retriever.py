@@ -20,6 +20,7 @@ from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
 
 from app.core.config import settings
+from app.core.observability import observe_with_tags
 
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "../../../../data/chroma_db")
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), "../../../../data/reports")

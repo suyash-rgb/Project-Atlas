@@ -1,5 +1,5 @@
 -- MySQL Initialization Script for Project Atlas
--- Sets up project_atlas database, read-write user, read-only user, and seed data
+-- Sets up the shared schema and seed data. Compose provisions DB users separately.
 
 CREATE DATABASE IF NOT EXISTS project_atlas CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE project_atlas;
@@ -89,12 +89,5 @@ INSERT IGNORE INTO clients (id, company, contact_email, purchased_reports) VALUE
 ('C-05', 'Global Grid Analytics', 'subs@globalgrid.example.com', 'R-105'),
 ('C-06', 'Public Tier Evaluation', 'visitor@cmr-trial.example.com', '');
 
--- 5. Create Read-Only User for Agent SQL Tool
-CREATE USER IF NOT EXISTS 'atlas_readonly'@'%' IDENTIFIED BY 'atlas_readonly_password';
-GRANT SELECT ON project_atlas.* TO 'atlas_readonly'@'%';
-
--- 6. Create Read-Write User for Backend/Portal
-CREATE USER IF NOT EXISTS 'atlas_user'@'%' IDENTIFIED BY 'atlas_password';
-GRANT ALL PRIVILEGES ON project_atlas.* TO 'atlas_user'@'%';
-
-FLUSH PRIVILEGES;
+-- Application users and least-privilege grants are provisioned by the
+-- db-roles Compose service from environment-provided credentials.

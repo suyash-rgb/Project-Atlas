@@ -1,5 +1,11 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
+
+TEST_API_KEY = "pytest-only-api-key"
+os.environ["API_KEY"] = TEST_API_KEY
+
 from app.main import app
 from app.schemas.chat import ChatResponse, ConflictItem, DerivedValueItem
 
@@ -14,7 +20,7 @@ def client():
 @pytest.fixture
 def auth_headers():
     """Provides valid authentication headers."""
-    return {"X-API-Key": "atlas_dev_secret_key"}
+    return {"X-API-Key": TEST_API_KEY}
 
 
 @pytest.fixture

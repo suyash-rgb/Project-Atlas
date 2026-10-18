@@ -3,7 +3,14 @@ from app.schemas.chat import HealthResponse
 
 
 class TestHealthRouter:
-    def test_get_api_v1_health_returns_200(self, client):
+    @patch("app.api.v1.routers.health.health_service.check_health")
+    def test_get_api_v1_health_returns_200(self, mock_check, client):
+        mock_check.return_value = HealthResponse(
+            status="healthy",
+            version="1.0.0",
+            database="connected",
+            vector_store="ready (1 chunks indexed)",
+        )
         response = client.get("/api/v1/health")
         assert response.status_code == 200
         data = response.json()

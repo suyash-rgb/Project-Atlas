@@ -1,22 +1,11 @@
-"""
-AST-Validated Read-Only SQL Tool.
-Enforces strict AST validation via sqlglot:
-- Permits exclusively SELECT statements.
-- Blocks multi-statement execution, mutations (DROP, DELETE, UPDATE, INSERT, ALTER),
-  and dangerous expressions.
-- Operates in strict read-only mode against project_atlas.db.
-- Enforces client entitlement constraints on the SQL layer.
-"""
+"""AST-validated, entitlement-aware SQL access through MySQL's read-only role."""
 
-import os
-import sqlite3
 from typing import List, Dict, Any, Optional
 import sqlglot
 from sqlglot import exp
 
 from app.core.observability import observe_with_tags
-
-DB_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../project_atlas.db"))
+from app.db.session import get_db_connection
 
 SCHEMA_DEFINITION = """
 Database Schema:
@@ -69,14 +58,14 @@ class SQLSecurityError(ValueError):
 
 def validate_read_only_ast(sql: str) -> exp.Expression:
     """
-    Parse SQL with sqlglot and strictly verify it contains exactly one SELECT statement.
+    Parse MySQL SQL with sqlglot and verify it contains exactly one SELECT statement.
     """
     clean_sql = sql.strip().rstrip(";")
     if ";" in clean_sql:
         raise SQLSecurityError("Multi-statement queries (semicolon chained) are forbidden.")
 
     try:
-        parsed = sqlglot.parse(clean_sql, read="sqlite")
+        parsed = sqlglot.parse(clean_sql, read="mysql")
     except Exception as e:
         raise SQLSecurityError(f"SQL Syntax Error: {e}")
 
@@ -108,20 +97,21 @@ def execute_safe_sql(
     allowed_reports: Optional[List[str]] = None
 ) -> List[Dict[str, Any]]:
     """
-    Executes an AST-validated read-only SQL query against SQLite.
+    Executes an AST-validated query through the restricted MySQL account.
     If allowed_reports is specified, verifies/filters results so unentitled paid reports
     are never returned.
     """
-    validate_read_only_ast(sql)
+    expression = validate_read_only_ast(sql)
 
-    if not os.path.exists(DB_PATH):
-        raise FileNotFoundError(f"Database not found at {DB_PATH}")
+    if allowed_reports is not None:
+        queried_tables = {table.name.lower() for table in expression.find_all(exp.Table)}
+        if not queried_tables or not queried_tables.issubset({"reports", "market_metrics"}):
+            raise SQLSecurityError(
+                "Entitlement-scoped queries may only read reports or market_metrics."
+            )
 
-    # Use URI with mode=ro for OS-level write-protection
-    uri = f"file:{DB_PATH}?mode=ro"
-    conn = sqlite3.connect(uri, uri=True)
-    conn.row_factory = sqlite3.Row
-    cursor = conn.cursor()
+    conn = get_db_connection(readonly=True)
+    cursor = conn.cursor(dictionary=True)
 
     try:
         cursor.execute(sql)
@@ -136,11 +126,12 @@ def execute_safe_sql(
         filtered = []
         for r in results:
             report_ref = r.get("report") or r.get("id")
-            # If the row has a report identifier and it's not in allowed_reports, check access
-            if report_ref and isinstance(report_ref, str) and report_ref.startswith("R-"):
-                if report_ref not in allowed_reports and r.get("access") != "public excerpt":
-                    continue  # drop unentitled row
-            filtered.append(r)
+            if not isinstance(report_ref, str):
+                raise SQLSecurityError(
+                    "Entitlement-scoped queries must return a report identifier."
+                )
+            if report_ref in allowed_reports:
+                filtered.append(r)
         return filtered
 
     return results
@@ -152,20 +143,17 @@ def execute_safe_sql(
 )
 def get_client_entitlements(client_id: str) -> List[str]:
     """Retrieve list of purchased report IDs for a client, plus public excerpts."""
-    if not os.path.exists(DB_PATH):
-        return ["R-102", "R-105"]
-
-    conn = sqlite3.connect(f"file:{DB_PATH}?mode=ro", uri=True)
+    conn = get_db_connection(readonly=True)
     cursor = conn.cursor()
     try:
-        cursor.execute("SELECT purchased_reports FROM clients WHERE id = ?", (client_id,))
+        cursor.execute("SELECT purchased_reports FROM clients WHERE id = %s", (client_id,))
         row = cursor.fetchone()
         purchased = []
         if row and row[0]:
             purchased = [p.strip() for p in row[0].split(",") if p.strip()]
 
         # Public reports are always accessible
-        cursor.execute("SELECT id FROM reports WHERE access LIKE '%public%'")
+        cursor.execute("SELECT id FROM reports WHERE access LIKE %s", ("%public%",))
         public_rows = cursor.fetchall()
         for pr in public_rows:
             if pr[0] not in purchased:

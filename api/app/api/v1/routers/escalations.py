@@ -20,6 +20,10 @@ router = APIRouter(prefix="/escalations", tags=["Escalations & Human-in-the-Loop
             "model": ErrorResponse,
             "description": "Forbidden - invalid or missing X-API-Key"
         },
+        503: {
+            "model": ErrorResponse,
+            "description": "Service Unavailable - API authentication is not configured"
+        },
         500: {
             "model": ErrorResponse,
             "description": "Internal Server Error - failed to query escalations database"

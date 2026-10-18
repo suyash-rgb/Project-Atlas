@@ -25,7 +25,7 @@ router = APIRouter(prefix="/health", tags=["Health & Diagnostics"])
 async def health_check(response: Response):
     """
     HTTP Controller for system diagnostics.
-    - Probes SQLite/MySQL database and ChromaDB collection status.
+    - Probes the shared MySQL database and ChromaDB collection status.
     - Emits HTTP 200 OK when fully healthy.
     - Emits HTTP 503 Service Unavailable if any core dependency is degraded.
     """
