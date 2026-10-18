@@ -41,3 +41,14 @@ class TestHealthRouter:
         data = response.json()
         assert data["status"] == "degraded"
         assert data["database"] == "not_found"
+
+    def test_get_health_metrics_returns_200(self, client):
+        response = client.get("/api/v1/health/metrics")
+        assert response.status_code == 200
+        data = response.json()
+        assert "total_requests" in data
+        assert "avg_latency_ms" in data
+        assert "cache_hit_rate" in data
+        assert "total_tokens_consumed" in data
+        assert "storage_footprint_mb" in data
+        assert data["storage_footprint_mb"] == 0.0
