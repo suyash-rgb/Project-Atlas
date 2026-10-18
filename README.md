@@ -75,3 +75,27 @@ flowchart TD
 - **Vector Store**: ChromaDB / Qdrant
 - **Observability**: Langfuse / LangSmith
 - **Containerization**: Docker Compose
+
+
+````mermaid
+flowchart TD
+    User([User Query + Client ID]) --> Intent[1. Laya / Router Node]
+    
+    subgraph LangGraph_Agent [LangGraph State Machine Engine]
+        Intent -->|prompt_injection / sql_attack| SecurityAudit[Security Log & Escalation]
+        Intent -->|factual_lookup / comparison| RetrieverNode[2. LlamaIndex Retriever]
+        Intent -->|database_aggregate| SQLTool[3. AST SQL Query Tool]
+        Intent -->|calculation| CalcEngine[4. Python Math Engine]
+        
+        RetrieverNode --> ReconcileNode[Conflict Detection Node]
+        ReconcileNode --> SynthesizerNode[LLM Response Generation]
+        SQLTool --> SynthesizerNode
+        CalcEngine --> SynthesizerNode
+    end
+    
+    SynthesizerNode --> FinalOutput([Structured JSON Response])
+    
+    subgraph Observability [Langfuse Tracing]
+        LangGraph_Agent -.->|Logs spans, latency, token usage, guardrail blocks| Langfuse[(Langfuse Dashboard)]
+    end
+````
