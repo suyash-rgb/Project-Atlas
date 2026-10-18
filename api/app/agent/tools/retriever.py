@@ -196,6 +196,62 @@ class EntitlementRetriever:
         )
         return total_chunks
 
+    def ingest_document_content(
+        self,
+        report_id: str,
+        title: str,
+        publisher: str,
+        published_date: str,
+        sector: str,
+        access_tier: str,
+        content: str
+    ) -> int:
+        """
+        Ingests and indexes document content chunks in ChromaDB with metadata.
+        """
+        paragraphs = [p.strip() for p in content.split("\n\n") if len(p.strip()) >= 20]
+        if not paragraphs:
+            paragraphs = [content.strip()] if content.strip() else []
+
+        if not paragraphs:
+            return 0
+
+        documents = []
+        for idx, para in enumerate(paragraphs, start=1):
+            doc = Document(
+                text=para,
+                metadata={
+                    "report_id": report_id,
+                    "page": idx,
+                    "title": title,
+                    "publisher": publisher,
+                    "published": published_date,
+                    "sector": sector,
+                    "access": access_tier,
+                }
+            )
+            documents.append(doc)
+
+        year_val = 2024
+        if len(published_date) >= 4 and published_date[:4].isdigit():
+            year_val = int(published_date[:4])
+
+        REPORT_METADATA_REGISTRY[report_id] = {
+            "title": title,
+            "publisher": publisher,
+            "sector": sector,
+            "year": year_val,
+            "access": access_tier,
+            "coverage": f"{sector} market coverage"
+        }
+
+        if self._index is not None:
+            for d in documents:
+                self._index.insert(d)
+
+        logger.info("document_ingested report_id=%s chunks=%s", report_id, len(documents))
+        return len(documents)
+
     @observe_with_tags(
         name="entitlement_filtered_retrieval",
         as_type="retriever",

@@ -28,6 +28,13 @@ class IngestRequest(BaseModel):
     content: str = Field(..., description="Full text or markdown content of the report")
 
 
+class IngestResponse(BaseModel):
+    status: str = Field("success", description="Status of ingestion")
+    report_id: str = Field(..., description="Report identifier")
+    chunks_ingested: int = Field(..., description="Count of chunks created and indexed")
+    message: str = Field(..., description="Status summary message")
+
+
 # --- Sub-models for Structured Chat Response ---
 
 class ConflictItem(BaseModel):
