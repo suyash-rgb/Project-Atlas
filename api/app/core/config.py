@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     GROQ_API_KEY: Optional[str] = None
     GROQ_MODEL: str = "openai/gpt-oss-20b"
 
+    DB_TYPE: str = "sqlite"
+    SQLITE_DB_PATH: str = str(REPOSITORY_ROOT / "data" / "atlas.db")
+
     MYSQL_HOST: str = "localhost"
     MYSQL_PORT: int = 3306
     MYSQL_DATABASE: str = "project_atlas"
