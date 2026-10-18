@@ -132,27 +132,26 @@ class LangfuseBridge:
             return
 
         try:
-            trace = self._client.trace(
-                id=trace_id,
+            obs = self._client.start_observation(
                 name="report_copilot_query",
-                user_id=client_id,
+                as_type="generation",
                 input=question,
-                output=answer[:500],
+                model="openai/gpt-oss-20b",
                 metadata={
+                    "trace_id": trace_id,
+                    "client_id": client_id,
                     "intent": intent,
                     "latency_ms": latency_ms,
                     "cost_usd": cost_usd
+                },
+                usage_details={
+                    "input": prompt_tokens,
+                    "output": completion_tokens,
+                    "total": prompt_tokens + completion_tokens
                 }
             )
-            trace.generation(
-                name="llm_synthesizer",
-                model="openai/gpt-oss-20b",
-                usage={
-                    "prompt_tokens": prompt_tokens,
-                    "completion_tokens": completion_tokens,
-                    "total_tokens": prompt_tokens + completion_tokens
-                }
-            )
+            obs.update(output=answer[:1000] if answer else "")
+            obs.end()
             self._client.flush()
         except Exception as e:
             logger.debug(f"Langfuse background event skipped: {e}")
