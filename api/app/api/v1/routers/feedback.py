@@ -1,9 +1,7 @@
-import os
-import sqlite3
 from fastapi import APIRouter, Security
 from app.api.deps import verify_api_key
 from app.schemas.chat import FeedbackRequest, FeedbackResponse
-from app.agent.tools.sql_tool import DB_PATH
+from app.services.feedback_service import feedback_service
 
 router = APIRouter(prefix="/feedback", tags=["Feedback & Analytics"])
 
@@ -11,16 +9,12 @@ router = APIRouter(prefix="/feedback", tags=["Feedback & Analytics"])
 @router.post("", response_model=FeedbackResponse, summary="Record client thumbs-up/down feedback")
 async def submit_feedback(fb: FeedbackRequest, _auth: str = Security(verify_api_key)):
     """
-    Persists thumbs-up or thumbs-down ratings to the SQLite feedback table.
-    Enables tracking of citation accuracy, user sentiment, and synthesis quality.
+    HTTP Controller for rating submissions.
+    Delegates persistence to FeedbackService.
     """
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    cursor.execute(
-        "INSERT INTO feedback (client_id, message_id, rating, comment) VALUES (?, ?, ?, ?)",
-        (fb.client_id, fb.message_id or "msg_live", fb.rating, fb.comment or "")
+    return feedback_service.record_feedback(
+        client_id=fb.client_id,
+        rating=fb.rating,
+        message_id=fb.message_id,
+        comment=fb.comment
     )
-    conn.commit()
-    cursor.close()
-    conn.close()
-    return FeedbackResponse(status="success", message="Feedback recorded.")
