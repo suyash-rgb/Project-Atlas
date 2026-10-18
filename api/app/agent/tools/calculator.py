@@ -57,17 +57,16 @@ def extract_numbers_from_query(query: str) -> Dict[str, float]:
     if pct_match:
         found["cagr_pct"] = float(pct_match.group(1))
 
-    # Check for years (e.g. from 2024 to 2030, or by 2030)
-    year_range = re.search(r'(?:from\s+)?(20[2-3][0-9])\s*(?:to|-)\s*(20[2-3][0-9])', query, re.IGNORECASE)
-    if year_range:
-        y1, y2 = int(year_range.group(1)), int(year_range.group(2))
+    # Check for years
+    all_years = [int(y) for y in re.findall(r'\b(20[2-3][0-9])\b', query)]
+    if len(all_years) >= 2:
+        y1, y2 = min(all_years), max(all_years)
         found["start_year"] = float(y1)
         found["end_year"] = float(y2)
         found["periods"] = float(y2 - y1)
-    else:
-        target_year = re.search(r'(?:by|in|for)\s+(20[2-3][0-9])', query, re.IGNORECASE)
-        if target_year:
-            found["target_year"] = float(target_year.group(1))
+        found["target_year"] = float(y2)
+    elif len(all_years) == 1:
+        found["target_year"] = float(all_years[0])
 
     return found
 
@@ -87,8 +86,11 @@ def calculate_projection(
     """
     Generates a formal DerivedValueItem with explicit math formula and verified assumptions.
     """
+    if target_year < base_year:
+        raise ValueError(f"Target year ({target_year}) must be greater than or equal to base year ({base_year}).")
     n = target_year - base_year
     future_val = compute_future_value(base_value, cagr_decimal, n)
+
     cagr_display = cagr_decimal * 100
 
     formula_str = f"V_{target_year} = V_{base_year} * (1 + CAGR)^{n} = {base_value} * (1 + {cagr_decimal:.4f})^{n}"

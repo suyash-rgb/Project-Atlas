@@ -55,3 +55,27 @@ def test_extract_numbers_from_query(query):
         assert values["periods"] == 6.0
     else:
         assert values["target_year"] == 2030.0
+
+
+def test_calculate_projection_rejects_target_year_before_base_year():
+    with pytest.raises(ValueError, match="must be greater than or equal to base year"):
+        calculate_projection(
+            metric_name="Market size",
+            base_value=4.21,
+            base_year=2030,
+            target_year=2024,
+            cagr_decimal=0.112,
+        )
+
+
+def test_extract_numbers_multi_year_formats():
+    res1 = extract_numbers_from_query("Forecast growth between 2024 and 2030")
+    assert res1["start_year"] == 2024.0
+    assert res1["end_year"] == 2030.0
+    assert res1["periods"] == 6.0
+
+    res2 = extract_numbers_from_query("Estimate from 2025 to 2029 for $3.87B with 9.8%")
+    assert res2["base_value_billion"] == pytest.approx(3.87)
+    assert res2["cagr_pct"] == pytest.approx(9.8)
+    assert res2["periods"] == 4.0
+

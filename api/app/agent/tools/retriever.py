@@ -20,11 +20,18 @@ from llama_index.embeddings.fastembed import FastEmbedEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
 
-from app.core.config import settings
+from app.core.config import REPOSITORY_ROOT, settings
 from app.core.observability import observe_with_tags
+from app.agent.tools.utils import (
+    DEFAULT_REPORT_METADATA,
+    fetch_report_metadata,
+    fetch_all_reports_metadata,
+    get_public_report_ids,
+    register_runtime_report,
+)
 
-CHROMA_PATH = os.path.join(os.path.dirname(__file__), "../../../../data/chroma_db")
-REPORTS_DIR = os.path.join(os.path.dirname(__file__), "../../../../data/reports")
+CHROMA_PATH = str(getattr(settings, "CHROMA_DB_PATH", None) or (REPOSITORY_ROOT / "data" / "chroma_db"))
+REPORTS_DIR = str(getattr(settings, "REPORTS_DIR", None) or (REPOSITORY_ROOT / "data" / "reports"))
 COLLECTION_NAME = "project_atlas_reports"
 logger = logging.getLogger("project_atlas.retriever")
 
@@ -32,57 +39,9 @@ logger = logging.getLogger("project_atlas.retriever")
 Settings.embed_model = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
 Settings.node_parser = SentenceSplitter(chunk_size=512, chunk_overlap=64)
 
+# Dynamic accessor for backward-compatible metadata lookups
+REPORT_METADATA_REGISTRY = fetch_all_reports_metadata()
 
-REPORT_METADATA_REGISTRY = {
-    "R-101": {
-        "title": "Global Smart Water Meter Market 2025-2032",
-        "publisher": "Cognitive Market Research",
-        "sector": "Utilities",
-        "year": 2024,
-        "access": "paid",
-        "coverage": "Turnkey solutions (hardware, AMI software, installation, maintenance)"
-    },
-    "R-102": {
-        "title": "Smart Water Metering Industry Outlook 2024",
-        "publisher": "Aquila Market Insights",
-        "sector": "Utilities",
-        "year": 2024,
-        "access": "public_excerpt",
-        "coverage": "Hardware only (meter units and physical endpoints)"
-    },
-    "R-103": {
-        "title": "Residential Water Purifier Market 2025",
-        "publisher": "Cognitive Market Research",
-        "sector": "Consumer / Water Treatment",
-        "year": 2024,
-        "access": "paid",
-        "coverage": "Residential reverse osmosis and UV filtration systems"
-    },
-    "R-104": {
-        "title": "Commercial Industrial Water Treatment 2025",
-        "publisher": "Cognitive Market Research",
-        "sector": "Industrial",
-        "year": 2024,
-        "access": "paid",
-        "coverage": "High-volume RO membranes and commercial filtration"
-    },
-    "R-105": {
-        "title": "Smart Multi-Utility Metering Outlook 2024",
-        "publisher": "Apex Grid Insights",
-        "sector": "Utilities",
-        "year": 2024,
-        "access": "public_excerpt",
-        "coverage": "Multi-commodity metering (water, gas, electric grid)"
-    },
-    "R-106": {
-        "title": "Decentralized Wastewater Treatment 2025",
-        "publisher": "Cognitive Market Research",
-        "sector": "Infrastructure",
-        "year": 2024,
-        "access": "paid",
-        "coverage": "Decentralized modular wastewater recycling"
-    }
-}
 
 
 class RetrievedChunk(BaseModel):
@@ -140,14 +99,7 @@ class EntitlementRetriever:
         logger.info("report_ingestion_started files=%s", len(pdf_files))
         for filename in pdf_files:
             report_id = filename.split("_")[0]
-            report_meta = REPORT_METADATA_REGISTRY.get(report_id, {
-                "title": filename,
-                "publisher": "Unknown",
-                "sector": "General",
-                "year": 2024,
-                "access": "paid",
-                "coverage": "Market study"
-            })
+            report_meta = fetch_report_metadata(report_id)
 
             file_path = os.path.join(REPORTS_DIR, filename)
             try:
@@ -162,11 +114,11 @@ class EntitlementRetriever:
                         metadata={
                             "report_id": report_id,
                             "page": page_num,
-                            "title": str(report_meta["title"]),
-                            "publisher": str(report_meta["publisher"]),
-                            "sector": str(report_meta["sector"]),
-                            "year": int(report_meta["year"]),
-                            "access": str(report_meta["access"]),
+                            "title": str(report_meta.get("title", filename)),
+                            "publisher": str(report_meta.get("publisher", "Unknown")),
+                            "sector": str(report_meta.get("sector", "General")),
+                            "year": int(report_meta.get("year", 2024)),
+                            "access": str(report_meta.get("access", "paid")),
                             "source_file": filename
                         }
                     )
@@ -188,7 +140,7 @@ class EntitlementRetriever:
             storage_context=StorageContext.from_defaults(vector_store=ChromaVectorStore(chroma_collection=self._collection)),
             show_progress=True
         )
-        total_chunks = self._collection.count()
+        total_chunks = self._collection.count() if self._collection is not None else len(documents)
         logger.info(
             "report_ingestion_completed documents=%s chunks=%s",
             len(documents),
@@ -233,17 +185,19 @@ class EntitlementRetriever:
             documents.append(doc)
 
         year_val = 2024
-        if len(published_date) >= 4 and published_date[:4].isdigit():
-            year_val = int(published_date[:4])
+        if published_date and len(str(published_date)) >= 4 and str(published_date)[:4].isdigit():
+            year_val = int(str(published_date)[:4])
 
-        REPORT_METADATA_REGISTRY[report_id] = {
+        register_runtime_report(report_id, {
             "title": title,
             "publisher": publisher,
             "sector": sector,
+            "published": published_date,
             "year": year_val,
             "access": access_tier,
             "coverage": f"{sector} market coverage"
-        }
+        })
+        REPORT_METADATA_REGISTRY[report_id] = fetch_report_metadata(report_id)
 
         if self._index is not None:
             for d in documents:
@@ -268,11 +222,17 @@ class EntitlementRetriever:
         reports are excluded at the ChromaDB vector level.
         """
         # Always allow public excerpts in addition to purchased reports
-        public_reports = [
-            rid for rid, meta in REPORT_METADATA_REGISTRY.items()
-            if "public" in meta.get("access", "").lower()
-        ]
-        allowed_reports = list(set(purchased_reports + public_reports))
+        public_reports = get_public_report_ids()
+        allowed_reports = sorted(list(set(purchased_reports + public_reports)))
+
+        # Edge case protection: ChromaDB raises ValueError if $in operand is empty list
+        if not allowed_reports:
+            logger.info("vector_retrieval_empty_allowed_reports query=%s", query)
+            return []
+
+        if self._index is None or (self._collection and self._collection.count() == 0):
+            logger.warning("vector_retrieval_empty_collection query=%s", query)
+            return []
 
         # Build MetadataFilter
         filters = MetadataFilters(
@@ -289,6 +249,7 @@ class EntitlementRetriever:
             filters=filters,
             similarity_top_k=top_k
         )
+
 
         try:
             nodes = retriever.retrieve(query)

@@ -7,42 +7,18 @@ from typing import List, Dict, Any, Optional
 import sqlglot
 from sqlglot import exp
 
+from app.core.config import settings
 from app.core.observability import observe_with_tags
 from app.db.session import get_db_connection
+from app.agent.tools.utils import DATABASE_SCHEMA_DOC, DEFAULT_CLIENT_ENTITLEMENTS
 
 logger = logging.getLogger("project_atlas.sql")
 
 MAX_QUERY_ROWS = 100
 DEFAULT_QUERY_TIMEOUT_SECONDS = 5.0
 
-SCHEMA_DEFINITION = """
-Database Schema:
-1. reports (
-    id VARCHAR(32) PRIMARY KEY,
-    title TEXT NOT NULL,
-    publisher VARCHAR(255) NOT NULL,
-    published DATE NOT NULL,
-    sector VARCHAR(128) NOT NULL,
-    access VARCHAR(64) NOT NULL -- 'paid' or 'public excerpt'
-)
+SCHEMA_DEFINITION = DATABASE_SCHEMA_DOC
 
-2. market_metrics (
-    id INTEGER PRIMARY KEY,
-    report VARCHAR(32) NOT NULL, -- references reports(id)
-    metric VARCHAR(128) NOT NULL, -- e.g. 'Market size', 'CAGR', 'Regional share'
-    region VARCHAR(64) NOT NULL, -- e.g. 'Global', 'APAC', 'North America'
-    year_period VARCHAR(64) NOT NULL, -- e.g. '2024', '2025-2030'
-    value VARCHAR(64) NOT NULL, -- e.g. 'USD 4.21 B', '11.2 %'
-    scope_note TEXT -- Methodology and scope details (e.g. Turnkey vs Hardware-only)
-)
-
-3. clients (
-    id VARCHAR(32) PRIMARY KEY,
-    company VARCHAR(255) NOT NULL,
-    contact_email VARCHAR(255) NOT NULL,
-    purchased_reports TEXT NOT NULL -- e.g. 'R-101, R-103'
-)
-"""
 
 FORBIDDEN_EXPRESSIONS = (
     exp.Insert,
@@ -141,7 +117,8 @@ def execute_safe_sql(
     conn = get_db_connection(readonly=True)
     cursor = conn.cursor(dictionary=True)
 
-    sanitized_sql = expression.sql("mysql")
+    dialect = "sqlite" if getattr(settings, "DB_TYPE", "sqlite").lower() == "sqlite" else "mysql"
+    sanitized_sql = expression.sql(dialect)
     started_at = time.perf_counter()
     try:
         try:
@@ -182,7 +159,7 @@ def execute_safe_sql(
     if allowed_reports is not None:
         filtered = []
         for r in results:
-            report_ref = r.get("report") or r.get("id")
+            report_ref = r.get("report") or r.get("id") or r.get("report_id")
             if not isinstance(report_ref, str):
                 raise SQLSecurityError(
                     "Entitlement-scoped queries must return a report identifier."
@@ -200,14 +177,6 @@ def execute_safe_sql(
 )
 def get_client_entitlements(client_id: str) -> List[str]:
     """Retrieve list of purchased report IDs for a client, plus public excerpts."""
-    fallback_map = {
-        "C-01": ["R-101", "R-103", "R-102", "R-105"],
-        "C-02": ["R-103", "R-102", "R-105"],
-        "C-03": ["R-104", "R-106", "R-102", "R-105"],
-        "C-04": ["R-101", "R-102", "R-105"],
-        "C-05": ["R-105", "R-102"],
-        "C-06": ["R-102", "R-105"],
-    }
     try:
         conn = get_db_connection(readonly=True)
     except Exception as exc:
@@ -216,21 +185,24 @@ def get_client_entitlements(client_id: str) -> List[str]:
             client_id,
             type(exc).__name__,
         )
-        return fallback_map.get(client_id, ["R-102", "R-105"])
+        return list(DEFAULT_CLIENT_ENTITLEMENTS.get(client_id, ["R-102", "R-105"]))
 
     cursor = conn.cursor()
     try:
         cursor.execute("SELECT purchased_reports FROM clients WHERE id = %s", (client_id,))
         row = cursor.fetchone()
         purchased = []
-        if row and row[0]:
-            purchased = [p.strip() for p in str(row[0]).split(",") if p.strip()]
+        if row:
+            raw_reports = row.get("purchased_reports") if isinstance(row, dict) else row[0]
+            if raw_reports:
+                purchased = [p.strip() for p in str(raw_reports).split(",") if p.strip()]
 
         # Public reports are always accessible
         cursor.execute("SELECT id FROM reports WHERE access LIKE %s", ("%public%",))
         public_rows = cursor.fetchall()
         for pr in public_rows:
-            report_id = str(pr[0]) if pr and pr[0] is not None else None
+            raw_id = pr.get("id") if isinstance(pr, dict) else pr[0]
+            report_id = str(raw_id) if raw_id is not None else None
             if report_id and report_id not in purchased:
                 purchased.append(report_id)
 
@@ -246,7 +218,8 @@ def get_client_entitlements(client_id: str) -> List[str]:
             client_id,
             type(exc).__name__,
         )
-        return fallback_map.get(client_id, ["R-102", "R-105"])
+        return list(DEFAULT_CLIENT_ENTITLEMENTS.get(client_id, ["R-102", "R-105"]))
     finally:
         cursor.close()
         conn.close()
+
