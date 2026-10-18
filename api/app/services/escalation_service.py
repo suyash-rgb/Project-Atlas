@@ -1,7 +1,10 @@
+import logging
 from typing import List, Optional
 from datetime import datetime
 from app.db.session import get_db_connection
 from app.schemas.chat import EscalationItem
+
+logger = logging.getLogger("project_atlas.escalations")
 
 
 class EscalationService:
@@ -23,6 +26,10 @@ class EscalationService:
                 (limit,)
             )
             rows = cursor.fetchall()
+            logger.info("escalations_listed count=%s limit=%s", len(rows), limit)
+        except Exception as exc:
+            logger.exception("escalations_list_failed error_type=%s", type(exc).__name__)
+            raise
         finally:
             cursor.close()
             conn.close()
@@ -72,8 +79,13 @@ class EscalationService:
             )
             conn.commit()
             return cursor.lastrowid or 0
-        except Exception:
+        except Exception as exc:
             conn.rollback()
+            logger.exception(
+                "escalation_write_failed client_id=%s error_type=%s",
+                client_id,
+                type(exc).__name__,
+            )
             raise
         finally:
             cursor.close()

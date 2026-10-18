@@ -11,6 +11,7 @@ Performs sub-40ms classification across 7 categories:
 """
 
 import os
+import logging
 from typing import Dict, Any, Optional
 from pydantic import BaseModel
 import laya
@@ -18,6 +19,7 @@ import laya
 from app.core.observability import observe_with_tags
 
 MODEL_DIR = os.path.join(os.path.dirname(__file__), "../../../models/laya_router")
+logger = logging.getLogger("project_atlas.agent.router")
 
 INTENT_QUESTIONS = {
     "intent": {
@@ -56,14 +58,14 @@ class LayaRouter:
     def _init_agent(self):
         resolved_path = os.path.abspath(MODEL_DIR)
         if not os.path.exists(os.path.join(resolved_path, "model.safetensors")):
-            print(f"Laya model weights not found at {resolved_path}; using heuristic router.")
+            logger.warning("router_model_unavailable path=%s fallback=heuristic", resolved_path)
             self._agent = None
             return
-        print(f"Initializing Laya Decision Router from: {resolved_path}")
+        logger.info("router_model_loading path=%s", resolved_path)
         try:
             self._agent = laya.load(resolved_path)
         except Exception as e:
-            print(f"Warning: Could not load Laya model into memory ({e}); falling back to heuristic router.")
+            logger.exception("router_model_load_failed error_type=%s fallback=heuristic", type(e).__name__)
             self._agent = None
 
     def _heuristic_route(self, query: str):
@@ -81,16 +83,26 @@ class LayaRouter:
         return "factual_lookup", 0.92
 
     def route(self, query: str) -> RouterDecision:
-        if self._agent is not None:
-            res = self._agent.predict(query, INTENT_QUESTIONS)
-            intent_data = res["answers"]["intent"]
-            choice = intent_data["choice"]
-            confidence = float(intent_data.get("confidence", 1.0))
-        else:
-            choice, confidence = self._heuristic_route(query)
+        try:
+            if self._agent is not None:
+                res = self._agent.predict(query, INTENT_QUESTIONS)
+                intent_data = res["answers"]["intent"]
+                choice = intent_data["choice"]
+                confidence = float(intent_data.get("confidence", 1.0))
+            else:
+                choice, confidence = self._heuristic_route(query)
+        except Exception as exc:
+            logger.exception("router_inference_failed error_type=%s", type(exc).__name__)
+            raise RuntimeError("Intent classification failed.") from exc
 
         is_attack = choice in ["prompt_injection", "sql_attack"]
         requires_escalation = is_attack or (confidence < 0.65)
+        logger.info(
+            "router_decision intent=%s confidence=%.3f attack=%s",
+            choice,
+            confidence,
+            is_attack,
+        )
 
         return RouterDecision(
             intent=choice,

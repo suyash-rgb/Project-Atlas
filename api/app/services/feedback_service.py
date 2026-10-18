@@ -1,6 +1,9 @@
+import logging
 from typing import Optional
 from app.db.session import get_db_connection
 from app.schemas.chat import FeedbackResponse
+
+logger = logging.getLogger("project_atlas.feedback")
 
 
 class FeedbackService:
@@ -37,14 +40,24 @@ class FeedbackService:
                     (client_id.strip(), message_id or "msg_live", normalized_rating, comment or "")
                 )
                 conn.commit()
-            except Exception:
+            except Exception as exc:
                 conn.rollback()
+                logger.exception(
+                    "feedback_write_failed client_id=%s error_type=%s",
+                    client_id.strip(),
+                    type(exc).__name__,
+                )
                 raise
             finally:
                 cursor.close()
                 conn.close()
             return FeedbackResponse(status="success", message="Feedback recorded.")
         except Exception as e:
+            logger.exception(
+                "feedback_persistence_failed client_id=%s error_type=%s",
+                client_id.strip(),
+                type(e).__name__,
+            )
             raise RuntimeError("Failed to persist feedback.") from e
 
 

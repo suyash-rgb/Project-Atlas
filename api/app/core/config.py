@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "Project Atlas - Report Copilot API"
     VERSION: str = "1.0.0"
     API_V1_PREFIX: str = "/api/v1"
+    LOG_LEVEL: str = "INFO"
 
     API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None

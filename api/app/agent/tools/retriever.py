@@ -8,6 +8,7 @@ Features:
 """
 
 import os
+import logging
 import chromadb
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
@@ -25,6 +26,7 @@ from app.core.observability import observe_with_tags
 CHROMA_PATH = os.path.join(os.path.dirname(__file__), "../../../../data/chroma_db")
 REPORTS_DIR = os.path.join(os.path.dirname(__file__), "../../../../data/reports")
 COLLECTION_NAME = "project_atlas_reports"
+logger = logging.getLogger("project_atlas.retriever")
 
 # Configure global LlamaIndex embedding model using BGE-Small ONNX
 Settings.embed_model = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
@@ -113,16 +115,20 @@ class EntitlementRetriever:
         vector_store = ChromaVectorStore(chroma_collection=self._collection)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
         self._index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
-        print(f"ChromaDB initialized with collection '{COLLECTION_NAME}' ({self._collection.count()} chunks)")
+        logger.info(
+            "vector_store_initialized collection=%s chunks=%s",
+            COLLECTION_NAME,
+            self._collection.count(),
+        )
 
     def ingest_reports(self, force_reload: bool = False) -> int:
         current_count = self._collection.count()
         if current_count > 0 and not force_reload:
-            print(f"ChromaDB already contains {current_count} chunks. Skipping ingestion.")
+            logger.info("report_ingestion_skipped reason=collection_populated chunks=%s", current_count)
             return current_count
 
         if force_reload and current_count > 0:
-            print("Purging existing collection for reload...")
+            logger.warning("report_ingestion_force_reload deleting_existing_chunks=%s", current_count)
             self._chroma_client.delete_collection(COLLECTION_NAME)
             self._collection = self._chroma_client.get_or_create_collection(COLLECTION_NAME)
             vector_store = ChromaVectorStore(chroma_collection=self._collection)
@@ -131,7 +137,7 @@ class EntitlementRetriever:
         pdf_files = [f for f in os.listdir(REPORTS_DIR) if f.endswith(".pdf")]
         documents = []
 
-        print(f"Ingesting {len(pdf_files)} PDF reports from {REPORTS_DIR}...")
+        logger.info("report_ingestion_started files=%s", len(pdf_files))
         for filename in pdf_files:
             report_id = filename.split("_")[0]
             report_meta = REPORT_METADATA_REGISTRY.get(report_id, {
@@ -166,16 +172,28 @@ class EntitlementRetriever:
                     )
                     documents.append(doc)
             except Exception as e:
-                print(f"Error parsing PDF {filename}: {e}")
+                logger.exception(
+                    "report_pdf_parse_failed file=%s error_type=%s",
+                    filename,
+                    type(e).__name__,
+                )
 
-        print(f"Extracted {len(documents)} page documents. Building VectorStoreIndex...")
+        if not documents:
+            logger.error("report_ingestion_failed reason=no_documents files=%s", len(pdf_files))
+            raise RuntimeError("No report pages were available to index.")
+
+        logger.info("report_index_build_started documents=%s", len(documents))
         self._index = VectorStoreIndex.from_documents(
             documents,
             storage_context=StorageContext.from_defaults(vector_store=ChromaVectorStore(chroma_collection=self._collection)),
             show_progress=True
         )
         total_chunks = self._collection.count()
-        print(f"Ingestion complete! Total indexed chunks: {total_chunks}")
+        logger.info(
+            "report_ingestion_completed documents=%s chunks=%s",
+            len(documents),
+            total_chunks,
+        )
         return total_chunks
 
     @observe_with_tags(
@@ -212,7 +230,15 @@ class EntitlementRetriever:
             similarity_top_k=top_k
         )
 
-        nodes = retriever.retrieve(query)
+        try:
+            nodes = retriever.retrieve(query)
+        except Exception as exc:
+            logger.exception(
+                "vector_retrieval_failed error_type=%s allowed_report_count=%s",
+                type(exc).__name__,
+                len(allowed_reports),
+            )
+            raise
         results = []
         for n in nodes:
             meta = n.metadata
@@ -226,6 +252,11 @@ class EntitlementRetriever:
                 access=str(meta.get("access", "paid"))
             ))
 
+        logger.info(
+            "vector_retrieval_completed result_count=%s allowed_report_count=%s",
+            len(results),
+            len(allowed_reports),
+        )
         return results
 
 

@@ -12,6 +12,7 @@ Orchestrates:
 """
 
 from typing import Callable, List, Dict, Any, Optional
+import logging
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableConfig
@@ -27,6 +28,8 @@ from app.agent.tools.retriever import get_retriever, RetrievedChunk
 from app.agent.tools.calculator import calculate_projection, extract_numbers_from_query
 from app.agent.reconcile import detect_report_conflicts
 from app.agent.synthesizer import get_synthesizer
+
+logger = logging.getLogger("project_atlas.agent.graph")
 
 
 # --- Agent State Definition ---
@@ -120,6 +123,11 @@ def sql_execution_node(state: AgentState) -> Dict[str, Any]:
     try:
         sql_results = execute_safe_sql(query_sql, allowed_reports=allowed)
     except Exception as e:
+        logger.exception(
+            "agent_sql_execution_failed error_type=%s client_id=%s",
+            type(e).__name__,
+            state.get("client_id", "unknown"),
+        )
         sql_results = [{"error": str(e)}]
 
     return {"sql_data": sql_results}

@@ -1,9 +1,12 @@
+import logging
+
 from fastapi import APIRouter, Security, HTTPException, status
 from app.api.deps import verify_api_key
 from app.schemas.chat import FeedbackRequest, FeedbackResponse, ErrorResponse
 from app.services.feedback_service import feedback_service
 
 router = APIRouter(prefix="/feedback", tags=["Feedback & Analytics"])
+logger = logging.getLogger("project_atlas.api.feedback")
 
 
 @router.post(
@@ -54,7 +57,8 @@ async def submit_feedback(fb: FeedbackRequest, _auth: str = Security(verify_api_
             detail=str(ve)
         )
     except Exception as e:
+        logger.exception("feedback_endpoint_failed error_type=%s", type(e).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Feedback persistence error: {str(e)}"
-        )
+            detail="Feedback could not be saved."
+        ) from e

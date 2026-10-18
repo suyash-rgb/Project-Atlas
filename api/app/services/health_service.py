@@ -29,7 +29,7 @@ class HealthService:
                 cursor.close()
                 conn.close()
         except Exception as exc:
-            logger.warning("MySQL readiness probe failed: %s", exc)
+            logger.warning("mysql_readiness_probe_failed error_type=%s", type(exc).__name__)
             db_connected = False
 
         db_status = "connected" if db_connected else "unavailable"
@@ -40,8 +40,9 @@ class HealthService:
             count = retriever._collection.count() if retriever._collection is not None else 0
             v_status = f"ready ({count} chunks indexed)"
             vector_ok = True
-        except Exception as e:
-            v_status = f"error: {str(e)}"
+        except Exception as exc:
+            logger.exception("vector_store_readiness_probe_failed error_type=%s", type(exc).__name__)
+            v_status = f"error: {type(exc).__name__}"
 
         overall_status = "healthy" if (db_connected and vector_ok) else "degraded"
 

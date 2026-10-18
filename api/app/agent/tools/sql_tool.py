@@ -1,11 +1,15 @@
 """AST-validated, entitlement-aware SQL access through MySQL's read-only role."""
 
+import logging
+import time
 from typing import List, Dict, Any, Optional
 import sqlglot
 from sqlglot import exp
 
 from app.core.observability import observe_with_tags
 from app.db.session import get_db_connection
+
+logger = logging.getLogger("project_atlas.sql")
 
 SCHEMA_DEFINITION = """
 Database Schema:
@@ -101,7 +105,11 @@ def execute_safe_sql(
     If allowed_reports is specified, verifies/filters results so unentitled paid reports
     are never returned.
     """
-    expression = validate_read_only_ast(sql)
+    try:
+        expression = validate_read_only_ast(sql)
+    except SQLSecurityError as exc:
+        logger.warning("read_only_query_rejected error_type=%s", type(exc).__name__)
+        raise
 
     if allowed_reports is not None:
         queried_tables = {table.name.lower() for table in expression.find_all(exp.Table)}
@@ -113,14 +121,28 @@ def execute_safe_sql(
     conn = get_db_connection(readonly=True)
     cursor = conn.cursor(dictionary=True)
 
+    started_at = time.perf_counter()
     try:
         cursor.execute(sql)
         rows = cursor.fetchall()
         results = [dict(row) for row in rows]
+    except Exception as exc:
+        logger.exception(
+            "read_only_query_failed error_type=%s table_count=%s",
+            type(exc).__name__,
+            len(queried_tables) if allowed_reports is not None else "unscoped",
+        )
+        raise
     finally:
         cursor.close()
         conn.close()
 
+    logger.info(
+        "read_only_query_completed row_count=%s duration_ms=%.1f entitlement_scoped=%s",
+        len(results),
+        (time.perf_counter() - started_at) * 1000,
+        allowed_reports is not None,
+    )
     # Enforce post-query entitlement filter if reports or market_metrics were queried
     if allowed_reports is not None:
         filtered = []
@@ -153,7 +175,12 @@ def get_client_entitlements(client_id: str) -> List[str]:
     }
     try:
         conn = get_db_connection(readonly=True)
-    except Exception:
+    except Exception as exc:
+        logger.warning(
+            "entitlement_lookup_fallback reason=connection_failed client_id=%s error_type=%s",
+            client_id,
+            type(exc).__name__,
+        )
         return fallback_map.get(client_id, ["R-101", "R-102", "R-103"])
 
     cursor = conn.cursor()
@@ -172,8 +199,18 @@ def get_client_entitlements(client_id: str) -> List[str]:
             if report_id and report_id not in purchased:
                 purchased.append(report_id)
 
+        logger.info(
+            "client_entitlements_loaded client_id=%s report_count=%s",
+            client_id,
+            len(purchased),
+        )
         return purchased
-    except Exception:
+    except Exception as exc:
+        logger.exception(
+            "entitlement_lookup_fallback reason=query_failed client_id=%s error_type=%s",
+            client_id,
+            type(exc).__name__,
+        )
         return fallback_map.get(client_id, ["R-101", "R-102", "R-103"])
     finally:
         cursor.close()

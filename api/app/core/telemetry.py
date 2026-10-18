@@ -113,7 +113,10 @@ class LangfuseBridge:
                 self.enabled = True
                 logger.info("Langfuse Cloud observability bridge initialized successfully.")
             except Exception as e:
-                logger.warning(f"Could not initialize Langfuse client: {e}. Falling back to structured logging.")
+                logger.exception(
+                    "langfuse_initialization_failed error_type=%s fallback=local_logging",
+                    type(e).__name__,
+                )
                 self.enabled = False
         else:
             logger.info("Langfuse keys not configured. Operating in zero-cost structured logging mode.")
@@ -167,7 +170,10 @@ class LangfuseBridge:
             root.end()
             self._client.flush()
         except Exception as e:
-            logger.debug(f"Langfuse background event skipped: {e}")
+            logger.warning(
+                "langfuse_trace_failed error_type=%s",
+                type(e).__name__,
+            )
 
 
 class TelemetryManager:
@@ -224,10 +230,16 @@ class TelemetryManager:
 
         # Structured JSON Log (Assignment compliant)
         logger.info(
-            f"[TELEMETRY] trace_id={record.trace_id} client={record.client_id} "
-            f"intent={record.intent} latency={record.latency_ms}ms "
-            f"tokens={record.total_tokens} cost=${record.estimated_cost_usd:.6f} "
-            f"cache={record.cache_hit}"
+            "telemetry_recorded trace_id=%s client_id=%s intent=%s latency_ms=%.2f "
+            "total_tokens=%s estimated_cost_usd=%.6f cache_hit=%s escalated=%s",
+            record.trace_id,
+            record.client_id,
+            record.intent,
+            record.latency_ms,
+            record.total_tokens,
+            record.estimated_cost_usd,
+            record.cache_hit,
+            record.escalated,
         )
 
         # Send to Langfuse Cloud if enabled

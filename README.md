@@ -98,16 +98,76 @@ read-only account with `SELECT` only before starting FastAPI or the portal.
 An existing MySQL volume is preserved; this role setup runs on every Compose
 start so the read-only account can also be established on an existing database.
 
-### Run locally
+### Run locally (Windows / PowerShell)
 
-In PowerShell, copy `.env.example` to `.env`, then provide unique values for
-`API_KEY`, `GROQ_API_KEY`, `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`,
-`MYSQL_PASSWORD`, and `MYSQL_READONLY_PASSWORD`. Keep the read-only username
-different from the read-write username. Start the services with:
+Prerequisites: Docker Desktop is installed and running with Linux containers
+enabled. The default Compose database is an isolated MySQL container; it does
+not automatically use a MySQL server installed on Windows.
+
+1. From the repository root, create your local environment file:
+
+   ```powershell
+   Copy-Item .env.example .env
+   notepad .env
+   ```
+
+2. Set non-empty, unique values for `API_KEY`, `GROQ_API_KEY`,
+   `MYSQL_ROOT_PASSWORD`, `MYSQL_USER`, `MYSQL_PASSWORD`,
+   `MYSQL_READONLY_USER`, and `MYSQL_READONLY_PASSWORD`. Use distinct database
+   usernames and passwords; do not use the MySQL root account as the app user.
+   The same `API_KEY` is forwarded to both FastAPI and the portal. Leave
+   `FASTAPI_URL=http://api:8000` for the Compose setup.
+
+   `MYSQL_HOST_PORT` controls the host-side port exposed for the Compose MySQL
+   service. The example uses `3307` to avoid colliding with an existing local
+   MySQL server listening on `3306`. Container-to-container traffic continues
+   to use the internal MySQL port `3306`.
+
+3. Validate Compose configuration and start the full stack:
+
+   ```powershell
+   docker compose config --quiet
+   docker compose up --build -d
+   ```
+
+4. Check service startup and health:
+
+   ```powershell
+   docker compose ps
+   Invoke-RestMethod http://localhost:8000/health
+   ```
+
+   Open the portal at <http://localhost:8080/index.php/chat> and FastAPI docs
+   at <http://localhost:8000/docs>. Wait for the API and database health checks
+   to pass before sending a chat request.
+
+5. Follow logs while testing:
+
+   ```powershell
+   docker compose logs -f --tail 100 db db-roles api portal
+   ```
+
+   Stop with `Ctrl+C`, then stop the stack without deleting its database volume:
+
+   ```powershell
+   docker compose down
+   ```
+
+   Do not add `-v` unless you explicitly intend to erase the Compose MySQL data.
+
+If `docker compose up` reports that a port is already allocated, check the
+ports in `docker-compose.yml`. For a conflict on host port 3306, set
+`MYSQL_HOST_PORT=3307` in `.env` and retry. A host MySQL server and the Compose
+MySQL container are separate databases: the project schema is created in the
+Compose database when its volume is initialized. To confirm that schema is
+present, run:
 
 ```powershell
-docker compose up --build
+docker compose exec db mysql -uroot -p -e "SHOW DATABASES LIKE 'project_atlas';"
 ```
+
+Enter the `MYSQL_ROOT_PASSWORD` value from `.env` at the prompt; do not put the
+password directly in the command.
 
 The portal forwards `API_KEY` as `ATLAS_API_KEY` to FastAPI. If running FastAPI
 outside Compose while the portal remains containerized, both processes must use
@@ -120,13 +180,33 @@ question text.
 
 For a host-run API with a containerized portal, set `FASTAPI_URL` to
 `http://host.docker.internal:8888` and keep the API process running on
-`0.0.0.0:8888`. For a fully Compose-managed stack, use `http://api:8000`.
+`0.0.0.0:8888`. Because `db` is only resolvable inside the Compose network,
+the host-run API must connect to the host MySQL instance instead. If that
+database is listening on the default port, start FastAPI from the `api`
+directory in PowerShell with:
+
+```powershell
+$env:MYSQL_HOST = "127.0.0.1"
+$env:MYSQL_PORT = "3306"
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8888
+```
+
+The root `.env` must also contain the API key, model key, and the application
+and read-only MySQL credentials provisioned in the host database. These
+PowerShell overrides apply only to this terminal session. For a fully
+Compose-managed stack, use `http://api:8000`; Compose sets the API's database
+host to `db` automatically.
 The API's `/health` route confirms reachability but does not authenticate;
 authenticated chat requests return `403` for a missing/mismatched key and
 `503` when the API itself has no key configured. A portal `502`/`503` instead
 points to a connection/configuration problem between CI3 and FastAPI. The
 portal's CI3 error log is enabled at error level under
 `portal/application/logs/`; Apache access logs also show the HTTP status.
+FastAPI uses `LOG_LEVEL` (`INFO` by default; set `DEBUG` for local diagnosis)
+and emits request IDs, status codes, durations, and categorized dependency or
+agent failures. Logs intentionally omit API/database passwords and raw chat
+questions. For a single request, correlate the `X-Request-ID` response header
+with API and portal logs.
 
 ### Streaming chat responses
 
@@ -143,8 +223,10 @@ cURL, and a web server configuration that does not buffer the response. The
 portal Docker image installs PHP's cURL extension. If a reverse proxy is added,
 it must also have response buffering disabled for this route.
 
-The API tests use mocked MySQL connections by default. To verify the actual
-MySQL read-only grant against a dedicated test database, set
+The API tests use mocked MySQL connections by default. One MySQL-role
+integration test is skipped by default because it requires a dedicated test
+database and explicit opt-in; it is not skipped merely because you only have a
+root account. To run it, set
 `ATLAS_MYSQL_INTEGRATION_TESTS=1` and the `ATLAS_MYSQL_TEST_HOST`,
 `ATLAS_MYSQL_TEST_DATABASE`, `ATLAS_MYSQL_TEST_READONLY_USER`, and
 `ATLAS_MYSQL_TEST_READONLY_PASSWORD` environment variables before running

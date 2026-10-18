@@ -11,6 +11,15 @@ from app.api.v1.api import api_router as api_v1_router
 
 logger = logging.getLogger("project_atlas.http")
 
+def configure_logging() -> None:
+    level = getattr(logging, settings.LOG_LEVEL.upper(), None)
+    if not isinstance(level, int):
+        raise ValueError("LOG_LEVEL must be a standard logging level such as INFO or DEBUG.")
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s %(levelname)s %(name)s %(message)s",
+    )
+
 
 class RequestLoggingMiddleware:
     def __init__(self, app):
@@ -62,6 +71,7 @@ class RequestLoggingMiddleware:
 
 
 def create_application() -> FastAPI:
+    configure_logging()
     app = FastAPI(
         title=settings.PROJECT_NAME,
         description="Enterprise Report Copilot API for Cognitive Market Research & Consulting. "

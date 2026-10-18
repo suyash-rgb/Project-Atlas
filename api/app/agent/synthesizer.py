@@ -6,6 +6,7 @@ reconciles methodology discrepancies, and constructs typed ChatResponse objects.
 
 import re
 import json
+import logging
 from typing import Callable, List, Optional, Dict, Any
 import groq
 
@@ -28,6 +29,8 @@ CORE OPERATIONAL RULES:
 5. METHODOLOGY DIFFERENCES: If comparing multiple sources (such as R-101 vs R-102), clearly explain the scope differences (e.g. Turnkey solutions vs hardware-only).
 6. TONE: Professional, quantitative, concise, and structured with bullet points.
 """
+
+logger = logging.getLogger("project_atlas.agent.synthesizer")
 
 
 def extract_citations(text: str) -> List[str]:
@@ -122,9 +125,8 @@ class LLMSynthesizer:
                         token_callback(token)
                 answer_text = "".join(answer_parts).strip()
         except Exception as e:
-            if token_callback is not None:
-                raise
-            answer_text = f"Error generating executive synthesis: {str(e)}"
+            logger.exception("synthesis_failed model=%s error_type=%s", self.model, type(e).__name__)
+            raise RuntimeError("LLM synthesis failed.") from e
 
         # Extract citations from answer and retrieved chunks
         citations = extract_citations(answer_text)

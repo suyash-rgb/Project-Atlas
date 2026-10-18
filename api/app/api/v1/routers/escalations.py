@@ -1,3 +1,4 @@
+import logging
 from typing import List
 from fastapi import APIRouter, Security, HTTPException, status
 from app.api.deps import verify_api_key
@@ -5,6 +6,7 @@ from app.schemas.chat import EscalationItem, ErrorResponse
 from app.services.escalation_service import escalation_service
 
 router = APIRouter(prefix="/escalations", tags=["Escalations & Human-in-the-Loop"])
+logger = logging.getLogger("project_atlas.api.escalations")
 
 
 @router.get(
@@ -39,7 +41,8 @@ async def get_escalations(_auth: str = Security(verify_api_key)):
     try:
         return escalation_service.get_all_escalations()
     except Exception as e:
+        logger.exception("escalations_endpoint_failed error_type=%s", type(e).__name__)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Escalation query error: {str(e)}"
-        )
+            detail="Escalations could not be retrieved."
+        ) from e
