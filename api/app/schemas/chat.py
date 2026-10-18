@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Any, Dict
-from datetime import datetime
+from datetime import datetime, timezone
 
 
 # --- Request Schemas ---
@@ -83,3 +83,9 @@ class FeedbackRequest(BaseModel):
 class FeedbackResponse(BaseModel):
     status: str
     message: str
+
+
+class ErrorResponse(BaseModel):
+    error: str = Field(..., description="High-level error classification")
+    detail: str = Field(..., description="Descriptive error detail")
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
