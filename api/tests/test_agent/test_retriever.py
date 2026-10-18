@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, Mock, patch
 import pytest
 
 from app.agent.tools.retriever import EntitlementRetriever, RetrievedChunk, get_retriever
+from app.agent.tools.hybrid import TFIDFIndex, reciprocal_rank_fusion, tokenize
 from app.agent.tools.utils import fetch_report_metadata, get_public_report_ids
 
 
@@ -59,6 +60,7 @@ def test_retrieve_for_client_filters_by_entitlements(monkeypatch):
     mock_index = Mock()
     mock_index.as_retriever = Mock(return_value=mock_query_retriever)
     monkeypatch.setattr(retriever, "_index", mock_index)
+    monkeypatch.setattr(retriever, "_sparse_index", None)
 
     results = retriever.retrieve_for_client(
         query="smart water metering market size",
@@ -142,3 +144,105 @@ def test_ingest_document_content_empty_content_returns_zero():
     retriever = get_retriever()
     assert retriever.ingest_document_content("R-000", "Empty", "Pub", "2025-01-01", "Sec", "paid", "") == 0
     assert retriever.ingest_document_content("R-000", "Empty", "Pub", "2025-01-01", "Sec", "paid", "   \n\n  ") == 0
+
+
+def test_sparse_tfidf_tokenization_and_filtering():
+    """Verify TF-IDF indexing, stop-word removal, and strict entitlement filtering."""
+    idx = TFIDFIndex()
+    idx.add_document(
+        doc_id="doc1",
+        report_id="R-101",
+        page=1,
+        text="The smart water market is projected to reach USD 4.21 B with a 11.8% CAGR.",
+        title="Report 101",
+        sector="Utilities",
+        access="paid",
+    )
+    idx.add_document(
+        doc_id="doc2",
+        report_id="R-103",
+        page=5,
+        text="Industrial IoT and smart water sensors deployment in APAC.",
+        title="Report 103",
+        sector="IoT",
+        access="paid",
+    )
+
+    # Search with allowed report R-101 only
+    results_r101 = idx.search("smart water CAGR", allowed_reports=["R-101"])
+    assert len(results_r101) == 1
+    doc, score = results_r101[0]
+    assert doc.report_id == "R-101"
+    assert score > 0.0
+
+    # Search with allowed report R-103 only (R-101 should not be returned even though it matches)
+    results_r103 = idx.search("smart water", allowed_reports=["R-103"])
+    assert len(results_r103) == 1
+    assert results_r103[0][0].report_id == "R-103"
+
+    # Search for term that only exists in R-101 but querying with only R-103 allowed
+    results_empty = idx.search("CAGR", allowed_reports=["R-103"])
+    assert len(results_empty) == 0
+
+
+def test_reciprocal_rank_fusion_math():
+    """Verify RRF reciprocal score formula and multi-source boost."""
+    class MockItem:
+        def __init__(self, item_id: str):
+            self.item_id = item_id
+
+    dense_candidates = [MockItem("docA"), MockItem("docB"), MockItem("docC")]
+    sparse_candidates = [MockItem("docB"), MockItem("docA"), MockItem("docD")]
+
+    fused = reciprocal_rank_fusion(
+        dense_items=dense_candidates,
+        sparse_items=sparse_candidates,
+        k=60,
+        dense_id_fn=lambda x: x.item_id,
+        sparse_id_fn=lambda x: x.item_id,
+    )
+
+    fused_ids = [item.item_id for item, _ in fused]
+    # docA and docB appear in both dense and sparse, so they must rank higher than docC and docD
+    assert set(fused_ids[:2]) == {"docA", "docB"}
+    assert set(fused_ids[2:]) == {"docC", "docD"}
+
+    # Exact score check for docA: dense rank 1 (1/61) + sparse rank 2 (1/62)
+    score_map = {item.item_id: score for item, score in fused}
+    expected_doc_a = (1.0 / 61) + (1.0 / 62)
+    assert abs(score_map["docA"] - expected_doc_a) < 1e-6
+
+
+def test_hybrid_retriever_exact_keyword_boost(monkeypatch):
+    """
+    Verify that hybrid search with RRF boosts documents with exact keyword matches
+    (e.g., exact report ID or metric) even when dense vector ranking alone would rank them lower.
+    """
+    retriever = get_retriever()
+
+    # Dense returns doc2 first, then doc1
+    dense_node_1 = FakeNode("General smart utility metering overview", {"report_id": "R-101", "page": 1, "title": "R-101", "sector": "Utilities", "access": "paid"}, 0.95)
+    dense_node_2 = FakeNode("Exact USD 4.21 B CAGR target analysis", {"report_id": "R-101", "page": 8, "title": "R-101", "sector": "Utilities", "access": "paid"}, 0.85)
+
+    mock_query_retriever = Mock()
+    mock_query_retriever.retrieve = Mock(return_value=[dense_node_1, dense_node_2])
+    mock_index = Mock()
+    mock_index.as_retriever = Mock(return_value=mock_query_retriever)
+    monkeypatch.setattr(retriever, "_index", mock_index)
+
+    # Sparse index heavily favors page 8 for "CAGR 4.21"
+    sparse_idx = TFIDFIndex()
+    sparse_idx.add_document("c1", "R-101", 1, "General smart utility metering overview")
+    sparse_idx.add_document("c2", "R-101", 8, "Exact USD 4.21 B CAGR target analysis")
+    monkeypatch.setattr(retriever, "_sparse_index", sparse_idx)
+
+    results = retriever.retrieve_for_client(
+        query="4.21 B CAGR",
+        purchased_reports=["R-101"],
+        top_k=2,
+    )
+
+    assert len(results) == 2
+    # The exact keyword match on page 8 should be boosted by RRF to rank 1
+    assert results[0].page == 8
+    assert results[0].score > results[1].score

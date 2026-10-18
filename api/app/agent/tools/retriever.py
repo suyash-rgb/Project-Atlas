@@ -22,6 +22,7 @@ from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, Filt
 
 from app.core.config import REPOSITORY_ROOT, settings
 from app.core.observability import observe_with_tags
+from app.agent.tools.hybrid import TFIDFIndex, reciprocal_rank_fusion
 from app.agent.tools.utils import (
     DEFAULT_REPORT_METADATA,
     fetch_report_metadata,
@@ -43,7 +44,6 @@ Settings.node_parser = SentenceSplitter(chunk_size=512, chunk_overlap=64)
 REPORT_METADATA_REGISTRY = fetch_all_reports_metadata()
 
 
-
 class RetrievedChunk(BaseModel):
     report_id: str
     page: int
@@ -59,10 +59,12 @@ class EntitlementRetriever:
     _chroma_client = None
     _collection = None
     _index = None
+    _sparse_index: Optional[TFIDFIndex] = None
 
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(EntitlementRetriever, cls).__new__(cls)
+            cls._instance._sparse_index = TFIDFIndex()
             cls._instance._init_index()
         return cls._instance
 
@@ -74,11 +76,32 @@ class EntitlementRetriever:
         vector_store = ChromaVectorStore(chroma_collection=self._collection)
         storage_context = StorageContext.from_defaults(vector_store=vector_store)
         self._index = VectorStoreIndex.from_vector_store(vector_store, storage_context=storage_context)
+
+        # Hydrate sparse TF-IDF index from existing Chroma collection chunks
+        if self._collection is not None and self._sparse_index is not None and self._collection.count() > 0:
+            existing = self._collection.get(include=["documents", "metadatas"])
+            doc_ids = existing.get("ids") or []
+            documents = existing.get("documents") or []
+            metadatas = existing.get("metadatas") or []
+            for did, doc_text, meta in zip(doc_ids, documents, metadatas):
+                if doc_text and meta:
+                    self._sparse_index.add_document(
+                        doc_id=did,
+                        report_id=str(meta.get("report_id", "UNKNOWN")),
+                        page=int(str(meta.get("page", 1))),
+                        text=doc_text,
+                        title=str(meta.get("title", "")),
+                        sector=str(meta.get("sector", "")),
+                        access=str(meta.get("access", "paid")),
+                    )
+            logger.info("sparse_tfidf_index_hydrated chunks=%s", len(doc_ids))
+
         logger.info(
             "vector_store_initialized collection=%s chunks=%s",
             COLLECTION_NAME,
-            self._collection.count(),
+            self._collection.count() if self._collection else 0,
         )
+
 
     def ingest_reports(self, force_reload: bool = False) -> int:
         current_count = self._collection.count()
@@ -92,6 +115,7 @@ class EntitlementRetriever:
             self._collection = self._chroma_client.get_or_create_collection(COLLECTION_NAME)
             vector_store = ChromaVectorStore(chroma_collection=self._collection)
             self._index = VectorStoreIndex.from_vector_store(vector_store)
+            self._sparse_index = TFIDFIndex()
 
         pdf_files = [f for f in os.listdir(REPORTS_DIR) if f.endswith(".pdf")]
         documents = []
@@ -141,6 +165,18 @@ class EntitlementRetriever:
             show_progress=True
         )
         total_chunks = self._collection.count() if self._collection is not None else len(documents)
+        if self._sparse_index is not None:
+            for idx, doc in enumerate(documents):
+                meta = doc.metadata or {}
+                self._sparse_index.add_document(
+                    doc_id=f"{meta.get('report_id')}_{meta.get('page')}_{idx}",
+                    report_id=str(meta.get("report_id", "UNKNOWN")),
+                    page=int(str(meta.get("page", 1))),
+                    text=doc.text,
+                    title=str(meta.get("title", "")),
+                    sector=str(meta.get("sector", "")),
+                    access=str(meta.get("access", "paid")),
+                )
         logger.info(
             "report_ingestion_completed documents=%s chunks=%s",
             len(documents),
@@ -185,8 +221,8 @@ class EntitlementRetriever:
             documents.append(doc)
 
         year_val = 2024
-        if published_date and len(str(published_date)) >= 4 and str(published_date)[:4].isdigit():
-            year_val = int(str(published_date)[:4])
+        if published_date and len(published_date) >= 4 and published_date[:4].isdigit():
+            year_val = int(published_date[:4])
 
         register_runtime_report(report_id, {
             "title": title,
@@ -203,13 +239,25 @@ class EntitlementRetriever:
             for d in documents:
                 self._index.insert(d)
 
+        if self._sparse_index is not None:
+            for idx, d in enumerate(documents, start=1):
+                self._sparse_index.add_document(
+                    doc_id=f"{report_id}_p{idx}_{d.text[:20]}",
+                    report_id=report_id,
+                    page=idx,
+                    text=d.text,
+                    title=title,
+                    sector=sector,
+                    access=access_tier,
+                )
+
         logger.info("document_ingested report_id=%s chunks=%s", report_id, len(documents))
         return len(documents)
 
     @observe_with_tags(
         name="entitlement_filtered_retrieval",
         as_type="retriever",
-        tags=["tool:retriever", "retrieval:entitlement-filtered"],
+        tags=["tool:retriever", "retrieval:entitlement-filtered", "retrieval:hybrid-rrf"],
     )
     def retrieve_for_client(
         self,
@@ -218,8 +266,9 @@ class EntitlementRetriever:
         top_k: int = 5
     ) -> List[RetrievedChunk]:
         """
-        Entitlement-filtered retrieval: guarantees that chunks from unpurchased
-        reports are excluded at the ChromaDB vector level.
+        Hybrid entitlement-filtered retrieval: combines dense vector search
+        (FastEmbed/ChromaDB) and sparse lexical search (TF-IDF) using Reciprocal Rank Fusion (RRF).
+        Guarantees that chunks from unpurchased reports are excluded across both retrieval paths.
         """
         # Always allow public excerpts in addition to purchased reports
         public_reports = get_public_report_ids()
@@ -234,7 +283,7 @@ class EntitlementRetriever:
             logger.warning("vector_retrieval_empty_collection query=%s", query)
             return []
 
-        # Build MetadataFilter
+        # 1. Dense Vector Retrieval (Candidate pool: top_k * 2)
         filters = MetadataFilters(
             filters=[
                 MetadataFilter(
@@ -245,14 +294,25 @@ class EntitlementRetriever:
             ]
         )
 
-        retriever = self._index.as_retriever(
-            filters=filters,
-            similarity_top_k=top_k
-        )
-
-
+        candidate_k = max(top_k * 2, 10)
+        dense_chunks: List[RetrievedChunk] = []
         try:
+            retriever = self._index.as_retriever(
+                filters=filters,
+                similarity_top_k=candidate_k
+            )
             nodes = retriever.retrieve(query)
+            for n in nodes:
+                meta = n.metadata
+                dense_chunks.append(RetrievedChunk(
+                    report_id=str(meta.get("report_id", "UNKNOWN")),
+                    page=int(str(meta.get("page", 1))),
+                    text=n.text,
+                    score=float(n.score if n.score is not None else 0.0),
+                    title=str(meta.get("title", "")),
+                    sector=str(meta.get("sector", "")),
+                    access=str(meta.get("access", "paid"))
+                ))
         except Exception as exc:
             logger.exception(
                 "vector_retrieval_failed error_type=%s allowed_report_count=%s",
@@ -260,25 +320,67 @@ class EntitlementRetriever:
                 len(allowed_reports),
             )
             raise
-        results = []
-        for n in nodes:
-            meta = n.metadata
-            results.append(RetrievedChunk(
-                report_id=str(meta.get("report_id", "UNKNOWN")),
-                page=int(meta.get("page", 1)),
-                text=n.text,
-                score=float(n.score if n.score is not None else 0.0),
-                title=str(meta.get("title", "")),
-                sector=str(meta.get("sector", "")),
-                access=str(meta.get("access", "paid"))
-            ))
+
+        # 2. Sparse TF-IDF Lexical Retrieval
+        sparse_chunks: List[RetrievedChunk] = []
+        if self._sparse_index is not None:
+            try:
+                sparse_matches = self._sparse_index.search(
+                    query=query,
+                    allowed_reports=allowed_reports,
+                    top_k=candidate_k
+                )
+                for s_doc, s_score in sparse_matches:
+                    sparse_chunks.append(RetrievedChunk(
+                        report_id=s_doc.report_id,
+                        page=s_doc.page,
+                        text=s_doc.text,
+                        score=float(s_score),
+                        title=s_doc.title,
+                        sector=s_doc.sector,
+                        access=s_doc.access,
+                    ))
+            except Exception as exc:
+                logger.warning("sparse_retrieval_failed error=%s", exc)
+
+        # 3. Reciprocal Rank Fusion (RRF)
+        if sparse_chunks and dense_chunks:
+            def _chunk_key(c: RetrievedChunk) -> str:
+                return f"{c.report_id}::p{c.page}::{c.text.strip()[:60]}"
+
+            fused = reciprocal_rank_fusion(
+                dense_items=dense_chunks,
+                sparse_items=sparse_chunks,
+                k=60,
+                dense_id_fn=_chunk_key,
+                sparse_id_fn=_chunk_key,
+            )
+            final_results: List[RetrievedChunk] = []
+            for item, rrf_score in fused[:top_k]:
+                final_results.append(RetrievedChunk(
+                    report_id=item.report_id,
+                    page=item.page,
+                    text=item.text,
+                    score=round(float(rrf_score), 4),
+                    title=item.title,
+                    sector=item.sector,
+                    access=item.access,
+                ))
+        elif dense_chunks:
+            final_results = dense_chunks[:top_k]
+        elif sparse_chunks:
+            final_results = sparse_chunks[:top_k]
+        else:
+            final_results = []
 
         logger.info(
-            "vector_retrieval_completed result_count=%s allowed_report_count=%s",
-            len(results),
+            "hybrid_retrieval_completed dense_count=%s sparse_count=%s fused_count=%s allowed_report_count=%s",
+            len(dense_chunks),
+            len(sparse_chunks),
+            len(final_results),
             len(allowed_reports),
         )
-        return results
+        return final_results
 
 
 _retriever_instance = None
