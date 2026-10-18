@@ -709,11 +709,11 @@
                         Hello! Welcome to the <strong>Cognitive Market Research Report Copilot</strong>. 
                         I have verified your active company license. Ask any factual lookup, growth rate derivation (CAGR), or cross-report comparison.
                         <br><br>
-                        <em>Sample queries to try:</em>
-                        <ul style="margin-left: 1.25rem; margin-top: 0.35rem; font-size: 0.88rem;">
-                            <li><em>"What will the smart water meter market be worth in 2030 in R-101?"</em></li>
-                            <li><em>"Why does R-101 report $4.21B while R-102 reports $3.87B for 2024?"</em></li>
-                            <li><em>"Which sector has the most published reports in your database?"</em></li>
+                        <em>Sample queries to try (click to run):</em>
+                        <ul style="margin-left: 1.25rem; margin-top: 0.5rem; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.4rem;">
+                            <li onclick="triggerQuickQuery('What will the smart water meter market be worth in 2030 in R-101?')" style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;"><i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "What will the smart water meter market be worth in 2030 in R-101?"</li>
+                            <li onclick="triggerQuickQuery('Why does R-101 report $4.21B while R-102 reports $3.87B for 2024?')" style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;"><i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Why does R-101 report $4.21B while R-102 reports $3.87B for 2024?"</li>
+                            <li onclick="triggerQuickQuery('Which sector has the most published reports in your database?')" style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;"><i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Which sector has the most published reports in your database?"</li>
                         </ul>
                     </div>
                 </div>
@@ -839,22 +839,34 @@
             }
             html += '</div>';
 
-            html += `<div class="answer-content">${data.answer || data.message || 'No answer generated.'}</div>`;
+            // Render simple markdown in answer
+            let formattedAnswer = (data.answer || data.message || 'No answer generated.')
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/`([^`]+)`/g, '<code>$1</code>')
+                .replace(/\n\n/g, '<br><br>')
+                .replace(/\n/g, '<br>');
+
+            html += `<div class="answer-content">${formattedAnswer}</div>`;
 
             // Derived values / formulas
             if (data.derived_values && data.derived_values.length > 0) {
-                html += '<div class="derived-callout"><strong><i class="fa-solid fa-calculator"></i> Derived Projection (Mathematical Calculation):</strong><br>';
+                html += '<div class="derived-callout"><strong><i class="fa-solid fa-calculator"></i> Derived Projection (Deterministic Math):</strong><br>';
                 data.derived_values.forEach(d => {
-                    html += `• <strong>${d.metric}:</strong> ${d.value} <br>&nbsp;&nbsp;<em>Formula:</em> <code>${d.formula}</code> &nbsp;|&nbsp; <em>Assumptions:</em> ${d.assumptions}<br>`;
+                    const val = d.estimated_value || d.value || '';
+                    const assum = Array.isArray(d.assumptions) ? d.assumptions.join('; ') : d.assumptions;
+                    html += `• <strong>${d.metric}:</strong> <span style="color:var(--cmr-primary); font-weight:700;">${val}</span><br>&nbsp;&nbsp;<em>Formula:</em> <code>${d.formula}</code><br>&nbsp;&nbsp;<em>Assumptions:</em> <small>${assum}</small><br>`;
                 });
                 html += '</div>';
             }
 
             // Conflicts
             if (data.conflicts && data.conflicts.length > 0) {
-                html += '<div class="conflict-callout"><strong><i class="fa-solid fa-triangle-exclamation"></i> Methodological Conflict Detected:</strong><br>';
+                html += '<div class="conflict-callout"><strong><i class="fa-solid fa-triangle-exclamation"></i> Methodological Conflict & Scope Divergence:</strong><br>';
                 data.conflicts.forEach(c => {
-                    html += `• <strong>${c.topic}:</strong> ${c.description}<br>&nbsp;&nbsp;<em>Resolution:</em> ${c.resolution}<br>`;
+                    const topic = c.metric || c.topic || 'Report Comparison';
+                    const diff = c.scope_differences || c.resolution || '';
+                    html += `• <strong>${topic}:</strong> ${c.description}<br>&nbsp;&nbsp;<em>Methodology Resolution:</em> ${diff}<br>`;
                 });
                 html += '</div>';
             }
@@ -863,7 +875,11 @@
             if (data.citations && data.citations.length > 0) {
                 html += '<div class="citations-section"><h5><i class="fa-solid fa-bookmark"></i> Verified Source Citations</h5>';
                 data.citations.forEach(cit => {
-                    html += `<div>• <strong>${cit.report_id}</strong> (Page ${cit.page}): <em>"${cit.quote || cit.text || ''}"</em></div>`;
+                    if (typeof cit === 'string') {
+                        html += `<div>• <span style="background:var(--cmr-primary); color:#fff; padding:2px 8px; border-radius:4px; font-weight:700; font-size:12px;"><i class="fa-solid fa-file-pdf"></i> ${cit}</span> Verified reference in Cognitive Market Research database</div>`;
+                    } else {
+                        html += `<div>• <strong>${cit.report_id}</strong> (Page ${cit.page}): <em>"${cit.quote || cit.text || ''}"</em></div>`;
+                    }
                 });
                 html += '</div>';
             }
@@ -934,6 +950,12 @@
                 });
             } catch (e) {}
         }
+
+        function triggerQuickQuery(text) {
+            chatInput.value = text;
+            sendMessage();
+        }
+        window.triggerQuickQuery = triggerQuickQuery;
 
         sendBtn.addEventListener('click', sendMessage);
         chatInput.addEventListener('keydown', (e) => {
