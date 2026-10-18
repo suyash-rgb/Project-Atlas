@@ -321,7 +321,7 @@ def main():
 
     # Temperature calibration
     if rank == 0:
-        print("\nFitting post-training calibration temperatures...")
+        print("\\nFitting post-training calibration temperatures...")
         del optimizer, scaler, scheduler
         torch.cuda.empty_cache()
         model.eval()
