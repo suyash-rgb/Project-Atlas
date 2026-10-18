@@ -60,7 +60,7 @@ from huggingface_hub import login
 
 # Set your Hugging Face write token
 HF_TOKEN = os.environ.get("HF_TOKEN_WRITE", "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")
-login(token=HF_TOKEN, write_permission=True)
+login(token=HF_TOKEN)
 print("Authenticated successfully with Hugging Face Hub.")"""))
 
 # ----------------- CELL 4: LOAD TRAINING DATASET -----------------
