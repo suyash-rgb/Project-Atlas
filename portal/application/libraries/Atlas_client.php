@@ -58,6 +58,98 @@ class Atlas_client {
     }
 
     /**
+     * Relay the FastAPI Server-Sent Events response to the browser without buffering.
+     */
+    public function stream_chat($client_id, $query) {
+        $url = rtrim($this->api_base_url, '/') . '/api/v1/chat/stream';
+        $payload = json_encode(array(
+            'client_id' => $client_id,
+            'query'     => $query
+        ));
+
+        if ($payload === false) {
+            log_message('error', 'Atlas_client could not encode the streaming request.');
+            $this->_send_stream_error(500, 'Could not encode the chat request.');
+            return;
+        }
+
+        $ch = curl_init();
+        if ($ch === false) {
+            log_message('error', 'Atlas_client could not initialize cURL for streaming.');
+            $this->_send_stream_error(503, 'The Report Copilot service is temporarily unavailable.');
+            return;
+        }
+
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        ob_implicit_flush(true);
+
+        $http_code = 0;
+        $content_type = 'text/event-stream';
+        $headers_sent = false;
+
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_POST, true);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 120);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+            'Content-Type: application/json',
+            'Accept: text/event-stream',
+            'X-API-Key: ' . $this->api_key
+        ));
+        curl_setopt($ch, CURLOPT_HEADERFUNCTION, function ($curl, $header) use (&$http_code, &$content_type, &$headers_sent) {
+            $length = strlen($header);
+            if (preg_match('/^HTTP\/\S+\s+(\d+)/i', $header, $matches)) {
+                $http_code = (int)$matches[1];
+            } elseif (stripos($header, 'Content-Type:') === 0) {
+                $content_type = trim(substr($header, strlen('Content-Type:')));
+            } elseif (trim($header) === '' && $http_code > 0 && !$headers_sent) {
+                http_response_code($http_code);
+                header('Content-Type: ' . $content_type);
+                header('Cache-Control: no-cache, no-transform');
+                header('X-Accel-Buffering: no');
+                $headers_sent = true;
+            }
+            return $length;
+        });
+        curl_setopt($ch, CURLOPT_WRITEFUNCTION, function ($curl, $chunk) use (&$headers_sent, &$http_code, &$content_type) {
+            if (!$headers_sent) {
+                http_response_code($http_code > 0 ? $http_code : 502);
+                header('Content-Type: ' . $content_type);
+                header('Cache-Control: no-cache, no-transform');
+                header('X-Accel-Buffering: no');
+                $headers_sent = true;
+            }
+            echo $chunk;
+            flush();
+            return strlen($chunk);
+        });
+
+        $result = curl_exec($ch);
+        $curl_error = curl_error($ch);
+        curl_close($ch);
+
+        if ($result === false) {
+            log_message('error', "Atlas_client streaming cURL request failed: {$curl_error}");
+            if (!$headers_sent) {
+                $this->_send_stream_error(502, 'The Report Copilot service could not be reached.');
+            } else {
+                echo "event: error\ndata: {\"message\":\"The connection to Report Copilot was interrupted.\"}\n\n";
+                flush();
+            }
+        }
+    }
+
+    private function _send_stream_error($code, $message) {
+        http_response_code($code);
+        header('Content-Type: application/json');
+        header('Cache-Control: no-cache');
+        echo json_encode(array('status' => 'error', 'message' => $message));
+    }
+
+    /**
      * Internal cURL helper with strict error and timeout management
      */
     private function _send_request($endpoint, $method = 'GET', $data = null) {

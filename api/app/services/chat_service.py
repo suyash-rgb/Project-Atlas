@@ -1,6 +1,6 @@
 import time
 import logging
-from typing import Optional
+from typing import Callable, Optional
 from app.schemas.chat import ChatResponse
 from app.agent.graph import run_agent_workflow
 from app.core.telemetry import telemetry
@@ -21,7 +21,12 @@ class ChatService:
         as_type="agent",
         tags=["project-atlas", "report-copilot", "market-research"],
     )
-    def process_chat_query(self, client_id: str, question: str) -> ChatResponse:
+    def process_chat_query(
+        self,
+        client_id: str,
+        question: str,
+        token_callback: Optional[Callable[[str], None]] = None,
+    ) -> ChatResponse:
         """
         Executes the LangGraph agent state machine:
         1. Checks in-memory semantic cache for repeated queries
@@ -44,6 +49,8 @@ class ChatService:
         # 1. Query Cache Check (Assignment Hard Part: repeated query cache)
         cached_response = telemetry.cache.get(cleaned_client, cleaned_question)
         if cached_response is not None:
+            if token_callback is not None:
+                token_callback(cached_response.answer)
             logger.info(f"Cache HIT for client={cleaned_client}: {cleaned_question[:50]}...")
             telemetry.record_request(
                 client_id=cleaned_client,
@@ -65,7 +72,8 @@ class ChatService:
         try:
             response: ChatResponse = run_agent_workflow(
                 client_id=cleaned_client,
-                question=cleaned_question
+                question=cleaned_question,
+                token_callback=token_callback,
             )
             latency_ms = (time.time() - t0) * 1000
 

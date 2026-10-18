@@ -14,8 +14,10 @@ class Chat extends CI_Controller {
         parent::__construct();
         $this->load->library('atlas_client');
         $this->load->helper(array('url', 'form', 'security'));
-        // Try loading database if configured; fallback gracefully if running standalone
-        $this->load->database('', TRUE);
+        // Load database if DB_HOST is explicitly configured (e.g. inside Docker Compose)
+        if (getenv('DB_HOST')) {
+            $this->load->database('', TRUE);
+        }
     }
 
     /**
@@ -74,6 +76,48 @@ class Chat extends CI_Controller {
     }
 
     /**
+     * AJAX endpoint that streams chat tokens through the PHP portal.
+     */
+    public function stream() {
+        if (!$this->input->is_ajax_request() && $this->input->method() !== 'post') {
+            show_404();
+            return;
+        }
+
+        $input = json_decode(file_get_contents('php://input'), true);
+        if (!is_array($input)) {
+            $this->output
+                ->set_content_type('application/json')
+                ->set_status_header(400)
+                ->set_output(json_encode(array(
+                    'status' => 'error',
+                    'message' => 'Invalid JSON request.'
+                )));
+            return;
+        }
+
+        $client_id = isset($input['client_id']) && is_string($input['client_id'])
+            ? $this->security->xss_clean($input['client_id'])
+            : 'C-01';
+        $query = isset($input['query']) && is_string($input['query'])
+            ? trim($input['query'])
+            : '';
+
+        if ($query === '') {
+            $this->output
+                ->set_content_type('application/json')
+                ->set_status_header(400)
+                ->set_output(json_encode(array(
+                    'status' => 'error',
+                    'message' => 'Query cannot be empty.'
+                )));
+            return;
+        }
+
+        $this->atlas_client->stream_chat($client_id, $query);
+    }
+
+    /**
      * AJAX endpoint to record thumbs-up / thumbs-down user feedback
      */
     public function feedback() {
@@ -91,7 +135,7 @@ class Chat extends CI_Controller {
         $comments = isset($input['comments']) ? $this->security->xss_clean($input['comments']) : '';
 
         // If database connection is active, insert into feedback table
-        if ($this->db && $this->db->conn_id) {
+        if (isset($this->db) && isset($this->db->conn_id) && $this->db->conn_id) {
             $this->db->insert('feedback', array(
                 'client_id' => $client_id,
                 'query'     => $query,

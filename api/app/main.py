@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+# Project Atlas API Gateway
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings

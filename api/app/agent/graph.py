@@ -11,9 +11,10 @@ Orchestrates:
 7. LLM Synthesizer (Executive answers with verified citations)
 """
 
-from typing import List, Dict, Any, Optional
+from typing import Callable, List, Dict, Any, Optional
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, END
+from langchain_core.runnables import RunnableConfig
 
 from app.schemas.chat import ChatResponse, ConflictItem, DerivedValueItem
 from app.agent.router import classify_query, RouterDecision
@@ -191,7 +192,7 @@ def out_of_scope_node(state: AgentState) -> Dict[str, Any]:
     return {"final_response": response}
 
 
-def synthesizer_node(state: AgentState) -> Dict[str, Any]:
+def synthesizer_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
     Node 3: Synthesizes final response via Groq LLM with citations and verified figures.
     """
@@ -200,12 +201,14 @@ def synthesizer_node(state: AgentState) -> Dict[str, Any]:
         return {}
 
     synthesizer = get_synthesizer()
+    token_callback = config.get("configurable", {}).get("token_callback")
     response = synthesizer.synthesize(
         query=state["question"],
         retrieved_chunks=state.get("retrieved_chunks", []),
         sql_data=state.get("sql_data", []),
         conflicts=state.get("conflicts", []),
-        derived_values=state.get("derived_values", [])
+        derived_values=state.get("derived_values", []),
+        token_callback=token_callback,
     )
 
     return {"final_response": response}
@@ -284,7 +287,11 @@ def get_agent_graph():
     return _compiled_graph
 
 
-def run_agent_workflow(client_id: str, question: str) -> ChatResponse:
+def run_agent_workflow(
+    client_id: str,
+    question: str,
+    token_callback: Optional[Callable[[str], None]] = None,
+) -> ChatResponse:
     """
     Public invocation interface:
     Resolves client entitlements, executes graph, returns typed ChatResponse.
@@ -309,5 +316,10 @@ def run_agent_workflow(client_id: str, question: str) -> ChatResponse:
         "final_response": None
     }
 
-    final_state = graph.invoke(initial_state)
+    graph_config = (
+        {"configurable": {"token_callback": token_callback}}
+        if token_callback is not None
+        else None
+    )
+    final_state = graph.invoke(initial_state, config=graph_config)
     return final_state["final_response"]

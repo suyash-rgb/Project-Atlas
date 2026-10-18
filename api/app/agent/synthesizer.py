@@ -6,7 +6,7 @@ reconciles methodology discrepancies, and constructs typed ChatResponse objects.
 
 import re
 import json
-from typing import List, Optional, Dict, Any
+from typing import Callable, List, Optional, Dict, Any
 import groq
 
 from app.schemas.chat import ChatResponse, ConflictItem, DerivedValueItem
@@ -63,6 +63,7 @@ class LLMSynthesizer:
         sql_data: Optional[List[Dict[str, Any]]] = None,
         conflicts: Optional[List[ConflictItem]] = None,
         derived_values: Optional[List[DerivedValueItem]] = None,
+        token_callback: Optional[Callable[[str], None]] = None,
     ) -> ChatResponse:
         # Build context string
         context_parts = []
@@ -106,11 +107,23 @@ class LLMSynthesizer:
                     {"role": "user", "content": user_content}
                 ],
                 temperature=0.1,
-                max_tokens=1024
+                max_tokens=1024,
+                stream=token_callback is not None,
             )
-            content = response.choices[0].message.content
-            answer_text = (content or "").strip()
+            if token_callback is None:
+                content = response.choices[0].message.content
+                answer_text = (content or "").strip()
+            else:
+                answer_parts = []
+                for chunk in response:
+                    token = chunk.choices[0].delta.content
+                    if token:
+                        answer_parts.append(token)
+                        token_callback(token)
+                answer_text = "".join(answer_parts).strip()
         except Exception as e:
+            if token_callback is not None:
+                raise
             answer_text = f"Error generating executive synthesis: {str(e)}"
 
         # Extract citations from answer and retrieved chunks

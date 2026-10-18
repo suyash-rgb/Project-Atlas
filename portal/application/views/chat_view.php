@@ -676,14 +676,6 @@
                 <!-- Populated dynamically based on selected client -->
             </div>
 
-            <div class="sidebar-section-title" style="margin-top: 0.5rem;">
-                <i class="fa-solid fa-shield-halved"></i> Security Guardrail
-            </div>
-
-            <div class="guardrail-status-card">
-                <strong><i class="fa-solid fa-circle-check"></i> Unified Classifier Active</strong>
-                Directs prompt injections and SQL destructive commands to security audit logging in under 35ms.
-            </div>
         </aside>
 
         <!-- Right Column: Interactive Chat Canvas -->
@@ -898,6 +890,84 @@
             chatStream.scrollTop = chatStream.scrollHeight;
         }
 
+        function createStreamingBubble() {
+            const bubble = document.createElement('div');
+            bubble.className = 'chat-bubble assistant-bubble';
+            const content = document.createElement('div');
+            content.className = 'answer-content';
+            content.setAttribute('aria-live', 'polite');
+            content.setAttribute('aria-label', 'Streaming assistant response');
+            bubble.appendChild(content);
+            chatStream.appendChild(bubble);
+            chatStream.scrollTop = chatStream.scrollHeight;
+            return { bubble, content };
+        }
+
+        async function consumeEventStream(response, onEvent) {
+            if (!response.body) {
+                throw new Error('This browser does not support streamed responses.');
+            }
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let eventName = 'message';
+            let dataLines = [];
+            let completed = false;
+
+            function dispatchEvent() {
+                if (dataLines.length === 0) return;
+                const payload = JSON.parse(dataLines.join('\n'));
+                if (eventName === 'complete') completed = true;
+                onEvent(eventName, payload);
+                eventName = 'message';
+                dataLines = [];
+            }
+
+            function processLines(finalChunk) {
+                let newline;
+                while ((newline = buffer.indexOf('\n')) !== -1) {
+                    let line = buffer.slice(0, newline);
+                    buffer = buffer.slice(newline + 1);
+                    if (line.endsWith('\r')) line = line.slice(0, -1);
+                    if (line === '') {
+                        dispatchEvent();
+                    } else if (line.charAt(0) !== ':') {
+                        const separator = line.indexOf(':');
+                        const field = separator === -1 ? line : line.slice(0, separator);
+                        let value = separator === -1 ? '' : line.slice(separator + 1);
+                        if (value.charAt(0) === ' ') value = value.slice(1);
+                        if (field === 'event') eventName = value;
+                        if (field === 'data') dataLines.push(value);
+                    }
+                }
+                if (finalChunk && buffer.length > 0) {
+                    if (buffer.endsWith('\r')) buffer = buffer.slice(0, -1);
+                    if (buffer.indexOf('data:') === 0) dataLines.push(buffer.slice(5).replace(/^ /, ''));
+                    dispatchEvent();
+                    buffer = '';
+                }
+            }
+
+            try {
+                while (true) {
+                    const result = await reader.read();
+                    buffer += decoder.decode(result.value || new Uint8Array(), { stream: !result.done });
+                    processLines(result.done);
+                    if (result.done) break;
+                }
+            } catch (error) {
+                await reader.cancel();
+                throw error;
+            } finally {
+                reader.releaseLock();
+            }
+
+            if (!completed) {
+                throw new Error('The streamed response ended before completion.');
+            }
+        }
+
         async function sendMessage() {
             const query = chatInput.value.trim();
             if (!query) return;
@@ -907,30 +977,58 @@
             sendBtn.disabled = true;
 
             const clientId = clientSelect.value;
+            const streaming = createStreamingBubble();
+            let completeResponse = null;
+            let receivedToken = false;
 
             try {
-                const res = await fetch('<?php echo site_url("chat/send"); ?>', {
+                const streamUrl = '<?php echo site_url("chat/stream"); ?>'.replace(/^https?:\/\/[^\/]+/, window.location.origin);
+                const res = await fetch(streamUrl, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'text/event-stream'
+                    },
                     body: JSON.stringify({ client_id: clientId, query: query })
                 });
 
-                const json = await res.json();
-                if (json.status === 'success' && json.data) {
-                    appendAssistantResponse(json.data);
+                if (!res.ok) {
+                    const error = await res.json().catch(() => ({}));
+                    throw new Error(error.detail || error.message || `Request failed (${res.status}).`);
+                }
+
+                await consumeEventStream(res, (event, payload) => {
+                    if (event === 'token') {
+                        if (!receivedToken) {
+                            streaming.content.textContent = '';
+                            receivedToken = true;
+                        }
+                        streaming.content.textContent += payload.text || '';
+                        chatStream.scrollTop = chatStream.scrollHeight;
+                    } else if (event === 'complete') {
+                        completeResponse = payload.response;
+                    } else if (event === 'error') {
+                        throw new Error(payload.message || 'The response could not be generated.');
+                    }
+                });
+
+                streaming.bubble.remove();
+                appendAssistantResponse(completeResponse);
+            } catch (err) {
+                const message = err.message || 'Connection error communicating with Report Copilot.';
+                if (receivedToken) {
+                    const notice = document.createElement('div');
+                    notice.className = 'stream-error';
+                    notice.textContent = `Response interrupted: ${message}`;
+                    streaming.bubble.appendChild(notice);
                 } else {
+                    streaming.bubble.remove();
                     appendAssistantResponse({
-                        answer: json.message || 'An error occurred while connecting to Report Copilot.',
+                        answer: message,
                         confidence: 0.0,
                         escalated: true
                     });
                 }
-            } catch (err) {
-                appendAssistantResponse({
-                    answer: 'Connection error communicating with the CodeIgniter portal backend.',
-                    confidence: 0.0,
-                    escalated: true
-                });
             } finally {
                 sendBtn.disabled = false;
             }
@@ -940,7 +1038,8 @@
             const bar = btn.parentElement;
             bar.innerHTML = '<span style="color: var(--cmr-success); font-weight: 600;"><i class="fa-solid fa-check"></i> Thank you! Your feedback has been recorded in our MySQL database.</span>';
             try {
-                await fetch('<?php echo site_url("chat/feedback"); ?>', {
+                const feedbackUrl = '<?php echo site_url("chat/feedback"); ?>'.replace(/^https?:\/\/[^\/]+/, window.location.origin);
+                await fetch(feedbackUrl, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({

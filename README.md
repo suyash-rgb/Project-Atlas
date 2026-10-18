@@ -109,6 +109,21 @@ different from the read-write username. Start the services with:
 docker compose up --build
 ```
 
+### Streaming chat responses
+
+The CI3 chat view uses browser `fetch()` with a readable response stream. The
+request travels through the CI3 `chat/stream` controller, which proxies
+FastAPI's `POST /api/v1/chat/stream` Server-Sent Events response without
+buffering it. Tokens appear as the model generates them; a final event carries
+the normal structured answer, citations, confidence, conflicts, and derived
+values so the existing response UI can render its metadata. The existing
+non-streaming `POST /api/v1/chat` endpoint remains available.
+
+Streaming requires a browser that supports Fetch Streams, FastAPI/ASGI, PHP
+cURL, and a web server configuration that does not buffer the response. The
+portal Docker image installs PHP's cURL extension. If a reverse proxy is added,
+it must also have response buffering disabled for this route.
+
 The API tests use mocked MySQL connections by default. To verify the actual
 MySQL read-only grant against a dedicated test database, set
 `ATLAS_MYSQL_INTEGRATION_TESTS=1` and the `ATLAS_MYSQL_TEST_HOST`,
