@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from typing import List, Optional, Any, Dict
 from datetime import datetime
 
@@ -7,7 +7,15 @@ from datetime import datetime
 
 class ChatRequest(BaseModel):
     client_id: str = Field(..., description="Unique client identifier, e.g., C-01, C-02")
-    question: str = Field(..., min_length=2, description="Natural language question or prompt")
+    question: str = Field(..., description="Natural language question or prompt")
+
+    @model_validator(mode="before")
+    @classmethod
+    def unify_query_and_question(cls, data: Any):
+        if isinstance(data, dict):
+            if "query" in data and not data.get("question"):
+                data["question"] = data["query"]
+        return data
 
 
 class IngestRequest(BaseModel):
