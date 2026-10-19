@@ -205,7 +205,6 @@ header.main-header {
     margin-top: 0.15rem;
 }
 
-
 .btn-view-library:hover {
     background: rgba(255, 255, 255, 0.25);
 }
@@ -570,6 +569,7 @@ footer.main-footer {
     align-items: center;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     margin-top: auto;
+    height: 100px;
 }
 
 footer.main-footer a {
