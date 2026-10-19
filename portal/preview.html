@@ -35,12 +35,9 @@
 
         <nav class="header-nav">
             <a href="javascript:void(0)" class="nav-link active" id="navHome" onclick="navigateTo('home')">Home</a>
-            <a href="javascript:void(0)" class="nav-link" id="navReports" onclick="navigateTo('home')">Market
-                Reports</a>
-            <a href="javascript:void(0)" class="nav-link" id="navCopilot" onclick="navigateTo('copilot')">Report Copilot
-                (AI)</a>
-            <a href="javascript:void(0)" class="nav-link" id="navAthenaeum" onclick="navigateTo('home')">Atlas
-                Access</a>
+            <a href="javascript:void(0)" class="nav-link" id="navReports" onclick="navigateTo('copilot')">Market Reports</a>
+            <a href="javascript:void(0)" class="nav-link" id="navCopilot" onclick="navigateTo('copilot')">Report Copilot (AI)</a>
+            <a href="javascript:void(0)" class="nav-link" id="navAthenaeum" onclick="navigateTo('copilot')">Atlas Access</a>
 
             <!-- Corporate Client Account Profile & Switch Session -->
             <div id="authProfileContainer" class="user-profile-nav" style="display: none;">
@@ -386,6 +383,45 @@
             email: 'ops@northwind.example.com'
         };
 
+        // View Navigation (Home Landing vs Copilot Chat)
+        function navigateTo(targetView) {
+            const viewLanding = document.getElementById('viewLanding');
+            const viewCopilot = document.getElementById('viewCopilot');
+            const navHome = document.getElementById('navHome');
+            const navCopilot = document.getElementById('navCopilot');
+            const navReports = document.getElementById('navReports');
+            const navAthenaeum = document.getElementById('navAthenaeum');
+
+            if (targetView === 'copilot') {
+                if (!activeClient) {
+                    openAuthModal();
+                    return;
+                }
+                if (viewLanding) viewLanding.style.display = 'none';
+                if (viewCopilot) viewCopilot.style.display = 'block';
+                if (navHome) navHome.classList.remove('active');
+                if (navCopilot) navCopilot.classList.add('active');
+                if (navAthenaeum) navAthenaeum.classList.add('active');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } else {
+                if (viewLanding) viewLanding.style.display = 'block';
+                if (viewCopilot) viewCopilot.style.display = 'none';
+                if (navHome) navHome.classList.add('active');
+                if (navCopilot) navCopilot.classList.remove('active');
+                if (navAthenaeum) navAthenaeum.classList.remove('active');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            }
+        }
+
+        function signOutClient() {
+            activeClient = null;
+            const authProfileContainer = document.getElementById('authProfileContainer');
+            const btnHeaderLogin = document.getElementById('btnHeaderLogin');
+            if (authProfileContainer) authProfileContainer.style.display = 'none';
+            if (btnHeaderLogin) btnHeaderLogin.style.display = 'inline-flex';
+            navigateTo('home');
+        }
+
         // Modal Controls
         function openAuthModal() {
             authModal.style.display = 'flex';
@@ -432,9 +468,14 @@
             // Update UI Profile Bar
             currentCompanyName.textContent = activeClient.company;
             currentClientIdBadge.textContent = activeClient.id;
+            const authProfileContainer = document.getElementById('authProfileContainer');
+            const btnHeaderLogin = document.getElementById('btnHeaderLogin');
+            if (authProfileContainer) authProfileContainer.style.display = 'flex';
+            if (btnHeaderLogin) btnHeaderLogin.style.display = 'none';
 
             closeAuthModal();
             updateSidebarEntitlements();
+            navigateTo('copilot');
 
             // Clear chat stream and show welcome greeting for this client
             chatStream.innerHTML = '';
