@@ -88,9 +88,10 @@ foreach ($sqlite_candidate_paths as $p) {
     }
 }
 
-$db_driver = getenv('DB_DRIVER') ?: ($sqlite_file ? 'sqlite3' : 'mysqli');
+$can_use_sqlite = extension_loaded('sqlite3') && $sqlite_file;
+$db_driver = getenv('DB_DRIVER') ?: ($can_use_sqlite ? 'sqlite3' : 'mysqli');
 
-if ($db_driver === 'sqlite3' && $sqlite_file) {
+if ($db_driver === 'sqlite3' && $can_use_sqlite) {
     $db['default'] = array(
         'dsn'          => '',
         'hostname'     => '',
