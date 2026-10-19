@@ -104,7 +104,7 @@ def create_application() -> FastAPI:
         allow_origins=settings.CORS_ALLOWED_ORIGINS,
         allow_credentials=False,
         allow_methods=["GET", "POST", "OPTIONS"],
-        allow_headers=["Content-Type", "X-API-Key"],
+        allow_headers=["*"],
     )
     app.add_middleware(RequestLoggingMiddleware)
 

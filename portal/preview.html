@@ -515,7 +515,9 @@
         // Dynamic Entitlements API Integration
         async function loadClientsList() {
             try {
-                const res = await fetch('http://127.0.0.1:8085/api/v1/clients');
+                const res = await fetch('http://127.0.0.1:8085/api/v1/clients', {
+                    headers: { 'X-API-Key': 'atlas_dev_secret_key' }
+                });
                 if (!res.ok) return;
                 const clients = await res.json();
                 if (clients && clients.length > 0) {
@@ -538,7 +540,9 @@
             entitlementList.innerHTML = '<div style="font-size: 0.78rem; color: #64748b; padding: 0.5rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading entitled reports...</div>';
 
             try {
-                const res = await fetch(`http://127.0.0.1:8085/api/v1/clients/${cid}/reports`);
+                const res = await fetch(`http://127.0.0.1:8085/api/v1/clients/${encodeURIComponent(cid)}/reports`, {
+                    headers: { 'X-API-Key': 'atlas_dev_secret_key' }
+                });
                 if (res.ok) {
                     const data = await res.json();
                     renderReportCards(data.reports || []);
