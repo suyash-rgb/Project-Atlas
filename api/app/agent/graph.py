@@ -11,10 +11,9 @@ Orchestrates:
 7. LLM Synthesizer (Executive answers with verified citations)
 """
 
-from typing import Callable, List, Dict, Any, Optional
+from typing import Callable, List, Dict, Any, Optional, TypedDict
 import logging
 import re
-from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableConfig
 
@@ -372,7 +371,7 @@ def route_after_guardrail(state: AgentState) -> str:
 # --- Assemble StateGraph ---
 
 def build_atlas_graph():
-    graph = StateGraph(AgentState)
+    graph = StateGraph(AgentState)  # type: ignore[arg-type]
 
     # Add Nodes
     graph.add_node("guardrail_router_node", guardrail_router_node)
@@ -455,8 +454,8 @@ def run_agent_workflow(
         "final_response": None
     }
 
-    graph_config = (
-        {"configurable": {"token_callback": token_callback}}
+    graph_config: Optional[RunnableConfig] = (
+        RunnableConfig(configurable={"token_callback": token_callback})
         if token_callback is not None
         else None
     )

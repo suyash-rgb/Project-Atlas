@@ -2,7 +2,7 @@
 
 import logging
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, cast
 import sqlglot
 from sqlglot import exp
 
@@ -67,7 +67,7 @@ def execute_safe_sql(
             except Exception as exc:
                 logger.exception("read_only_query_timeout_setup_failed engine=mysql")
                 raise RuntimeError("Could not configure the MySQL query timeout.") from exc
-        else:
+        elif hasattr(conn, "set_progress_handler"):
             conn.set_progress_handler(
                 lambda: int(time.monotonic() >= deadline),
                 1000,
@@ -91,7 +91,17 @@ def execute_safe_sql(
             raise TimeoutError(
                 f"SQL query execution exceeded timeout of {timeout_seconds}s."
             )
-        results = [dict(row) for row in rows]
+        results: List[Dict[str, Any]] = []
+        for row in rows:
+            if isinstance(row, dict):
+                results.append(row)
+            elif hasattr(row, "keys"):
+                results.append({str(k): row[k] for k in row.keys()})
+            elif hasattr(cursor, "description") and cursor.description:
+                cols = [col[0] for col in cursor.description]
+                results.append(dict(zip(cols, row)))
+            else:
+                results.append(dict(cast(Any, row)))
     except Exception as exc:
         logger.exception(
             "read_only_query_failed error_type=%s table_count=%s",
@@ -100,7 +110,7 @@ def execute_safe_sql(
         )
         raise
     finally:
-        if sqlite_timeout_enabled:
+        if sqlite_timeout_enabled and hasattr(conn, "set_progress_handler"):
             conn.set_progress_handler(None, 0)
         cursor.close()
         conn.close()

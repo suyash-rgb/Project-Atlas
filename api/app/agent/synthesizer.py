@@ -253,23 +253,33 @@ class LLMSynthesizer:
         user_content = f"USER QUERY:\n{query}\n\nAVAILABLE CONTEXT:\n" + "\n".join(context_parts)
         active_system_prompt = build_system_prompt(intent)
 
+        answer_parts: List[str] = []
         try:
-            response = self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": active_system_prompt},
-                    {"role": "user", "content": user_content}
-                ],
-                temperature=0.1,
-                max_tokens=1024,
-                stream=token_callback is not None,
-            )
             if token_callback is None:
-                content = response.choices[0].message.content
+                completion = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": active_system_prompt},
+                        {"role": "user", "content": user_content}
+                    ],
+                    temperature=0.1,
+                    max_tokens=1024,
+                    stream=False,
+                )
+                content = completion.choices[0].message.content
                 answer_text = (content or "").strip()
             else:
-                answer_parts = []
-                for chunk in response:
+                stream_resp = self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": active_system_prompt},
+                        {"role": "user", "content": user_content}
+                    ],
+                    temperature=0.1,
+                    max_tokens=1024,
+                    stream=True,
+                )
+                for chunk in stream_resp:
                     token = chunk.choices[0].delta.content
                     if token:
                         answer_parts.append(token)
