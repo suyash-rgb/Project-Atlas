@@ -1,19 +1,32 @@
 from app.schemas.chat import IngestRequest, IngestResponse
 from app.agent.tools.retriever import get_retriever
 from app.core.telemetry import logger
+from app.db.session import upsert_report_metadata
 
 
 class IngestService:
     def ingest_report(self, request: IngestRequest) -> IngestResponse:
+        upsert_report_metadata(
+            report_id=request.report_id,
+            title=request.title,
+            publisher=request.publisher,
+            published_date=request.published_date.isoformat(),
+            sector=request.sector,
+            access_tier=request.access_tier,
+        )
         retriever = get_retriever()
         chunks = retriever.ingest_document_content(
             report_id=request.report_id,
             title=request.title,
             publisher=request.publisher,
-            published_date=request.published_date,
+            published_date=request.published_date.isoformat(),
             sector=request.sector,
             access_tier=request.access_tier,
-            content=request.content
+            content=request.content or "",
+            pages=[
+                (page.page_number, page.content)
+                for page in request.pages or []
+            ],
         )
         logger.info(
             "ingest_service_completed report_id=%s chunks=%s",

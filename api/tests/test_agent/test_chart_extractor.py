@@ -20,6 +20,7 @@ import io
 import os
 import base64
 import pytest
+import pymupdf
 from unittest.mock import MagicMock, patch
 from PIL import Image
 
@@ -28,7 +29,6 @@ from app.agent.tools.chart_extractor import (
     validate_image_bytes,
     summarize_chart_image,
     extract_and_summarize_charts_from_pdf,
-    CHART_CACHE_DIR,
 )
 
 
@@ -241,8 +241,7 @@ def test_extract_and_summarize_charts_single_chart(tmp_path):
 
     with patch("pymupdf.open", return_value=mock_doc), \
          patch("app.agent.tools.chart_extractor.get_gemini_client", return_value=mock_client), \
-         patch("os.path.exists", side_effect=lambda p: False if p.endswith(".md") else True), \
-         patch("builtins.open", MagicMock()):
+         patch("app.agent.tools.chart_extractor.CHART_CACHE_DIR", str(tmp_path / "cache")):
         results = extract_and_summarize_charts_from_pdf(
             pdf_path=str(test_pdf),
             report_id="RPT-SINGLE",
@@ -299,8 +298,7 @@ def test_extract_and_summarize_charts_multiple_charts_across_pages(tmp_path):
 
     with patch("pymupdf.open", return_value=mock_doc), \
          patch("app.agent.tools.chart_extractor.get_gemini_client", return_value=mock_client), \
-         patch("os.path.exists", side_effect=lambda p: False if p.endswith(".md") else True), \
-         patch("builtins.open", MagicMock()):
+         patch("app.agent.tools.chart_extractor.CHART_CACHE_DIR", str(tmp_path / "cache")):
         results = extract_and_summarize_charts_from_pdf(
             pdf_path=str(test_pdf),
             report_id="RPT-MULTI",
@@ -339,3 +337,70 @@ def test_extract_and_summarize_charts_corrupted_image_skipped(tmp_path):
 
     # Corrupted image should be gracefully filtered out without crashing
     assert results == []
+
+
+def test_chart_cache_is_keyed_by_image_contents_and_vision_settings(tmp_path):
+    pdf_path = tmp_path / "changing_chart.pdf"
+    cache_dir = tmp_path / "chart-cache"
+    mock_client = MagicMock()
+    mock_client.models.generate_content.side_effect = [
+        MagicMock(text="First chart summary."),
+        MagicMock(text="Updated chart summary."),
+    ]
+
+    for color, expected in [("red", "First"), ("blue", "Updated")]:
+        image_bytes = create_test_image_bytes(size=(400, 300), color=color)
+        document = pymupdf.open()
+        page = document.new_page()
+        page.insert_image(page.rect, stream=image_bytes)
+        document.save(pdf_path)
+        document.close()
+
+        with patch(
+            "app.agent.tools.chart_extractor.CHART_CACHE_DIR",
+            str(cache_dir),
+        ), patch(
+            "app.agent.tools.chart_extractor.get_gemini_client",
+            return_value=mock_client,
+        ):
+            chunks = extract_and_summarize_charts_from_pdf(
+                str(pdf_path),
+                "R-991",
+                "Changing Chart",
+                min_size_bytes=100,
+            )
+
+        assert len(chunks) == 1
+        assert expected in chunks[0]["text"]
+
+    assert mock_client.models.generate_content.call_count == 2
+    assert len(list(cache_dir.glob("*.md"))) == 2
+
+
+def test_chart_fallback_is_not_cached_as_a_vision_summary(tmp_path):
+    pdf_path = tmp_path / "fallback_chart.pdf"
+    image_bytes = create_test_image_bytes(size=(400, 300), color="green")
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_image(page.rect, stream=image_bytes)
+    document.save(pdf_path)
+    document.close()
+
+    cache_dir = tmp_path / "chart-cache"
+    with patch(
+        "app.agent.tools.chart_extractor.CHART_CACHE_DIR",
+        str(cache_dir),
+    ), patch(
+        "app.agent.tools.chart_extractor.get_gemini_client",
+        return_value=None,
+    ):
+        chunks = extract_and_summarize_charts_from_pdf(
+            str(pdf_path),
+            "R-992",
+            "Fallback Chart",
+            min_size_bytes=100,
+        )
+
+    assert len(chunks) == 1
+    assert "Visual Market Chart" in chunks[0]["text"]
+    assert not list(cache_dir.glob("*.md"))

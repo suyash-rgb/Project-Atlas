@@ -1,8 +1,8 @@
 """
 Multimodal Chart Extractor & Visual Ground Truth Summarizer.
 
-Uses PyMuPDF to extract embedded vector/raster charts from PDF market reports
-and passes them to Gemini 3.5 Flash Lite vision model to convert graphics,
+Uses PyMuPDF to extract embedded raster charts from PDF market reports
+and passes them to a configured Gemini vision model to convert graphics,
 donut slices, and trajectory lines into structured, verifiable Markdown tables.
 """
 
@@ -11,16 +11,19 @@ import os
 import re
 import base64
 import binascii
+import hashlib
 import logging
+import tempfile
 from typing import Dict, Any, List, Optional, Union
-from PIL import Image, UnidentifiedImageError
+from PIL import Image
 import pymupdf
-from dotenv import load_dotenv
 
-load_dotenv()
+from app.core.config import settings
+
 logger = logging.getLogger("project_atlas.chart_extractor")
 
-CHART_CACHE_DIR = "data/chart_summaries"
+CHART_CACHE_DIR = settings.CHART_CACHE_DIR
+CHART_PROMPT_VERSION = "1"
 
 
 def decode_base64_image(b64_string: Optional[str]) -> Optional[bytes]:
@@ -75,14 +78,14 @@ def validate_image_bytes(image_bytes: Optional[Union[bytes, bytearray]]) -> bool
         with Image.open(io.BytesIO(image_bytes)) as img:
             img.verify()
         return True
-    except (UnidentifiedImageError, OSError, Exception) as exc:
+    except (Image.DecompressionBombError, OSError, ValueError) as exc:
         logger.debug("validate_image_bytes_failed error=%s", exc)
         return False
 
 
 def get_gemini_client():
     """Initialize Google GenAI client if API key is present."""
-    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    api_key = settings.GEMINI_API_KEY or settings.GOOGLE_API_KEY
     if not api_key:
         logger.warning("gemini_api_key_missing multimodal chart vision extraction skipped")
         return None
@@ -105,22 +108,24 @@ def summarize_chart_image(
     Summarizes a chart image (accepts PIL Image, raw bytes, or base64 string).
     Returns formatted Markdown table and takeaways, or fallback text on error/client unavailability.
     """
-    # Resolve raw image
+    # Copy loaded images so the request has a live image after its byte stream closes.
     pil_img: Optional[Image.Image] = None
 
     if isinstance(image_input, Image.Image):
-        pil_img = image_input
+        pil_img = image_input.copy()
     elif isinstance(image_input, (bytes, bytearray)):
         if not validate_image_bytes(image_input):
             logger.warning("summarize_chart_image_failed: invalid image bytes")
             return ""
-        pil_img = Image.open(io.BytesIO(image_input))
+        with Image.open(io.BytesIO(image_input)) as source:
+            pil_img = source.copy()
     elif isinstance(image_input, str):
         decoded = decode_base64_image(image_input)
         if not decoded:
             logger.warning("summarize_chart_image_failed: base64 decoding returned no valid image")
             return ""
-        pil_img = Image.open(io.BytesIO(decoded))
+        with Image.open(io.BytesIO(decoded)) as source:
+            pil_img = source.copy()
     else:
         logger.warning("summarize_chart_image_failed: unsupported image input type=%s", type(image_input))
         return ""
@@ -128,11 +133,11 @@ def summarize_chart_image(
     if client == "AUTO":
         client = get_gemini_client()
 
-    if not client:
-        logger.info("gemini_client_none: returning structured fallback representation")
-        return f"Visual Market Chart on Page {page_num} of {report_title} (Report {report_id})."
-
     try:
+        if not client:
+            logger.info("gemini_client_none: returning structured fallback representation")
+            return f"Visual Market Chart on Page {page_num} of {report_title} (Report {report_id})."
+
         prompt = (
             f"You are an expert market research data extractor analyzing Report {report_id}: '{report_title}' (Page {page_num}).\n"
             f"Extract all visual data points, categories, percentages, numbers, timeline years, and trends from this chart.\n"
@@ -143,7 +148,7 @@ def summarize_chart_image(
             f"- Bullet points of key findings"
         )
         resp = client.models.generate_content(
-            model="gemini-3.5-flash-lite",
+            model=settings.GEMINI_MODEL,
             contents=[prompt, pil_img]
         )
         summary = resp.text.strip() if (resp and resp.text) else ""
@@ -153,6 +158,8 @@ def summarize_chart_image(
     except Exception as exc:
         logger.warning("gemini_vision_call_failed report_id=%s page=%s error=%s", report_id, page_num, exc)
         return f"Visual Market Chart on Page {page_num} of {report_title} (Report {report_id}) [Vision processing error]."
+    finally:
+        pil_img.close()
 
 
 def extract_and_summarize_charts_from_pdf(
@@ -162,8 +169,8 @@ def extract_and_summarize_charts_from_pdf(
     min_size_bytes: int = 15000,
 ) -> List[Dict[str, Any]]:
     """
-    Extracts embedded charts from a report PDF, validates image integrity,
-    sends them to Gemini 3.5 Flash Lite for structured visual summarization,
+    Extracts embedded raster charts from a report PDF, validates image integrity,
+    sends them to the configured Gemini vision model for structured summarization,
     and returns enriched chart documents. Gracefully handles 0 charts, corrupted images,
     non-existent PDFs, and API errors.
     """
@@ -206,14 +213,49 @@ def extract_and_summarize_charts_from_pdf(
                         logger.warning("corrupted_image_skipped xref=%s page=%s", xref, actual_page_num)
                         continue
 
-                    cache_key = f"{report_id}_p{actual_page_num}_img{img_idx}.md"
-                    cache_path = os.path.join(CHART_CACHE_DIR, cache_key)
+                    cache_fingerprint = hashlib.sha256(
+                        b"\0".join(
+                            (
+                                report_id.encode("utf-8"),
+                                str(actual_page_num).encode("ascii"),
+                                str(img_idx).encode("ascii"),
+                                report_title.encode("utf-8"),
+                                settings.GEMINI_MODEL.encode("utf-8"),
+                                CHART_PROMPT_VERSION.encode("ascii"),
+                                img_bytes,
+                            )
+                        )
+                    ).hexdigest()
+                    cache_path = os.path.join(CHART_CACHE_DIR, f"{cache_fingerprint}.md")
+                    legacy_cache_path = os.path.join(
+                        CHART_CACHE_DIR,
+                        f"{report_id}_p{actual_page_num}_img{img_idx}.md",
+                    )
 
-                    # Use cached summary if available to save tokens/time
+                    summary_text = ""
                     if os.path.exists(cache_path):
                         with open(cache_path, "r", encoding="utf-8") as f:
                             summary_text = f.read().strip()
-                    else:
+                    elif (
+                        re.fullmatch(r"[A-Za-z0-9_-]{1,64}", report_id)
+                        and os.path.exists(legacy_cache_path)
+                    ):
+                        try:
+                            os.replace(legacy_cache_path, cache_path)
+                            with open(cache_path, "r", encoding="utf-8") as f:
+                                summary_text = f.read().strip()
+                        except OSError as cache_err:
+                            logger.warning(
+                                "legacy_chart_cache_migration_failed report_id=%s page=%s error=%s",
+                                report_id,
+                                actual_page_num,
+                                cache_err,
+                            )
+
+                    if summary_text.startswith("Visual Market Chart on Page"):
+                        summary_text = ""
+
+                    if not summary_text:
                         summary_text = summarize_chart_image(
                             image_input=img_bytes,
                             report_id=report_id,
@@ -221,12 +263,44 @@ def extract_and_summarize_charts_from_pdf(
                             report_title=report_title,
                             client=client,
                         )
-                        if summary_text and not summary_text.endswith("[Vision processing error]."):
+                        if (
+                            summary_text
+                            and not summary_text.startswith("Visual Market Chart on Page")
+                            and not summary_text.endswith("[Vision processing error].")
+                        ):
+                            temporary_path = None
                             try:
-                                with open(cache_path, "w", encoding="utf-8") as f:
+                                with tempfile.NamedTemporaryFile(
+                                    mode="w",
+                                    encoding="utf-8",
+                                    dir=CHART_CACHE_DIR,
+                                    prefix=".chart-summary-",
+                                    suffix=".tmp",
+                                    delete=False,
+                                ) as f:
+                                    temporary_path = f.name
                                     f.write(summary_text)
                             except Exception as write_err:
                                 logger.warning("cache_write_failed path=%s error=%s", cache_path, write_err)
+                            else:
+                                try:
+                                    os.replace(temporary_path, cache_path)
+                                except OSError as replace_err:
+                                    logger.warning(
+                                        "cache_write_failed path=%s error=%s",
+                                        cache_path,
+                                        replace_err,
+                                    )
+                            finally:
+                                if temporary_path and os.path.exists(temporary_path):
+                                    try:
+                                        os.unlink(temporary_path)
+                                    except OSError as cleanup_err:
+                                        logger.warning(
+                                            "cache_temp_cleanup_failed path=%s error=%s",
+                                            temporary_path,
+                                            cleanup_err,
+                                        )
 
                     if summary_text:
                         chart_chunks.append({
@@ -240,9 +314,6 @@ def extract_and_summarize_charts_from_pdf(
                 except Exception as e:
                     logger.warning("chart_extraction_failed report_id=%s page=%s img_idx=%s error=%s", report_id, actual_page_num, img_idx, e)
     finally:
-        try:
-            doc.close()
-        except Exception:
-            pass
+        doc.close()
 
     return chart_chunks

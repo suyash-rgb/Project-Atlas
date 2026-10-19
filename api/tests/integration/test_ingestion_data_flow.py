@@ -1,6 +1,8 @@
-from types import SimpleNamespace
-
-from llama_index.core import Settings
+import chromadb
+from uuid import uuid4
+from llama_index.core import Settings, VectorStoreIndex
+from llama_index.core.embeddings import MockEmbedding
+from llama_index.vector_stores.chroma import ChromaVectorStore
 
 from app.agent import graph
 from app.agent.router import RouterDecision
@@ -11,34 +13,13 @@ from app.schemas.chat import ChatResponse
 from app.services import ingest_service
 
 
-class InMemoryCollection:
-    def __init__(self):
-        self.documents = []
-
-    def count(self):
-        return len(self.documents)
-
-
-class SparseOnlyVectorIndex:
-    def __init__(self, collection):
-        self.collection = collection
-
-    def insert(self, document):
-        self.collection.documents.append(document)
-
-    def as_retriever(self, **_kwargs):
-        return SimpleNamespace(retrieve=lambda _query: [])
-
-
 def test_ingest_api_indexes_content_then_chat_retrieves_only_for_entitled_client(
     client,
     auth_headers,
     isolated_sqlite_database,
-    seed_report,
     monkeypatch,
 ):
     report_id = "R-990"
-    seed_report(report_id)
     connection = retriever_module.get_db_connection()
     cursor = connection.cursor()
     try:
@@ -52,20 +33,18 @@ def test_ingest_api_indexes_content_then_chat_retrieves_only_for_entitled_client
         cursor.close()
         connection.close()
 
-    collection = InMemoryCollection()
+    monkeypatch.setattr(Settings, "embed_model", MockEmbedding(embed_dim=8))
+    chroma_client = chromadb.EphemeralClient()
+    collection = chroma_client.get_or_create_collection(f"ingestion-chat-{uuid4().hex}")
+    vector_store = ChromaVectorStore(chroma_collection=collection)
     test_retriever = object.__new__(retriever_module.EntitlementRetriever)
     test_retriever._collection = collection
-    test_retriever._index = SparseOnlyVectorIndex(collection)
+    test_retriever._index = VectorStoreIndex.from_vector_store(vector_store)
     test_retriever._sparse_index = TFIDFIndex()
     monkeypatch.setattr(ingest_service, "get_retriever", lambda: test_retriever)
     monkeypatch.setattr(graph, "get_retriever", lambda: test_retriever)
     monkeypatch.setattr(retriever_module, "get_reranker", lambda: SemanticReRanker())
-    monkeypatch.setattr(Settings, "embed_model", None)
 
-    content = (
-        "The aquaculture equipment market reached USD 5.60 billion in 2025.\n\n"
-        "The report attributes growth to regional recirculating systems demand."
-    )
     payload = {
         "report_id": report_id,
         "title": "Integration Chart Report",
@@ -73,16 +52,45 @@ def test_ingest_api_indexes_content_then_chat_retrieves_only_for_entitled_client
         "published_date": "2025-06-01",
         "sector": "Utilities",
         "access_tier": "paid",
-        "content": content,
+        "pages": [
+            {
+                "page_number": 8,
+                "content": "The aquaculture equipment market reached USD 5.60 billion in 2025.",
+            },
+            {
+                "page_number": 11,
+                "content": "Growth is attributed to regional recirculating systems demand.",
+            },
+        ],
     }
 
     unauthenticated = client.post("/api/v1/ingest", json=payload)
     assert unauthenticated.status_code == 403
+    assert collection.count() == 0
 
     ingested = client.post("/api/v1/ingest", json=payload, headers=auth_headers)
     assert ingested.status_code == 201
     assert ingested.json()["chunks_ingested"] == 2
     assert collection.count() == 2
+
+    # Replacing the same report must not accumulate stale dense or sparse chunks.
+    repeated_ingest = client.post("/api/v1/ingest", json=payload, headers=auth_headers)
+    assert repeated_ingest.status_code == 201
+    assert collection.count() == 2
+    assert len(test_retriever._sparse_index.documents) == 2
+
+    connection = retriever_module.get_db_connection(readonly=True)
+    cursor = connection.cursor(dictionary=True)
+    try:
+        cursor.execute("SELECT title, access FROM reports WHERE id = %s", (report_id,))
+        stored_report = cursor.fetchone()
+    finally:
+        cursor.close()
+        connection.close()
+    assert stored_report == {
+        "title": "Integration Chart Report",
+        "access": "paid",
+    }
 
     captured_chunks = []
 
@@ -92,9 +100,10 @@ def test_ingest_api_indexes_content_then_chat_retrieves_only_for_entitled_client
             captured_chunks.append(chunks)
             if chunks:
                 report = chunks[0]
+                citation = f"[{report.report_id} p.{report.page}]"
                 return ChatResponse(
-                    answer=f"Chart data is 5.60 billion [{report.report_id} p.{report.page}].",
-                    citations=[f"[{report.report_id} p.{report.page}]"],
+                    answer=f"Chart data is 5.60 billion {citation}.",
+                    citations=[citation],
                     confidence=0.9,
                 )
             return ChatResponse(
@@ -127,9 +136,10 @@ def test_ingest_api_indexes_content_then_chat_retrieves_only_for_entitled_client
     )
 
     assert entitled_answer.status_code == 200
-    assert entitled_answer.json()["answer"] == "Chart data is 5.60 billion [R-990 p.1]."
+    assert "5.60 billion" in entitled_answer.json()["answer"]
     assert captured_chunks[0]
     assert all(chunk.report_id == report_id for chunk in captured_chunks[0])
+    assert {chunk.page for chunk in captured_chunks[0]} <= {8, 11}
     assert unentitled_answer.status_code == 200
     assert report_id not in unentitled_answer.json()["answer"]
     assert all(chunk.report_id != report_id for chunk in captured_chunks[1])

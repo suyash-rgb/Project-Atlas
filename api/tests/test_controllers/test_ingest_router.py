@@ -97,4 +97,5 @@ class TestIngestRouter:
             headers=auth_headers
         )
         assert response.status_code == 500
-        assert "Ingestion failed: ChromaDB index unreachable" in response.json()["detail"]
+        assert response.json()["detail"] == "Ingestion failed. Check the server logs for details."
+        assert "ChromaDB index unreachable" not in response.json()["detail"]

@@ -15,6 +15,13 @@ class Settings(BaseSettings):
     API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
     GROQ_MODEL: str = "openai/gpt-oss-20b"
+    GEMINI_API_KEY: Optional[str] = None
+    GOOGLE_API_KEY: Optional[str] = None
+    GEMINI_MODEL: str = "gemini-3.5-flash-lite"
+    CORS_ALLOWED_ORIGINS: list[str] = [
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+    ]
 
     DB_TYPE: str = "sqlite"
     SQLITE_DB_PATH: str = str(REPOSITORY_ROOT / "data" / "atlas.db")
@@ -28,7 +35,9 @@ class Settings(BaseSettings):
     MYSQL_READONLY_PASSWORD: Optional[str] = None
 
     # Vector Database (ChromaDB)
-    CHROMA_PERSIST_DIRECTORY: str = "./chroma_db"
+    CHROMA_PERSIST_DIRECTORY: str = str(REPOSITORY_ROOT / "data" / "chroma_db")
+    REPORTS_DIR: str = str(REPOSITORY_ROOT / "data" / "reports")
+    CHART_CACHE_DIR: str = str(REPOSITORY_ROOT / "data" / "chart_summaries")
 
     # Langfuse Observability
     LANGFUSE_PUBLIC_KEY: Optional[str] = None

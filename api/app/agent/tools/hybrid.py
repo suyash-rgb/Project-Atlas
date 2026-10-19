@@ -77,13 +77,7 @@ class TFIDFIndex:
     ) -> None:
         """Add or update a document chunk in the inverted index."""
         if doc_id in self.documents:
-            # Remove old document terms from df
-            old_unique = set(self.documents[doc_id].token_counts.keys())
-            for t in old_unique:
-                self.df[t] -= 1
-                if self.df[t] <= 0:
-                    del self.df[t]
-            self.total_docs -= 1
+            self.remove_document(doc_id)
 
         doc = SparseDocument(
             doc_id=doc_id,
@@ -99,6 +93,28 @@ class TFIDFIndex:
 
         for term in set(doc.token_counts.keys()):
             self.df[term] += 1
+
+    def remove_document(self, doc_id: str) -> None:
+        """Remove a document and its terms from the inverted index."""
+        document = self.documents.pop(doc_id, None)
+        if document is None:
+            return
+
+        for term in document.token_counts:
+            self.df[term] -= 1
+            if self.df[term] <= 0:
+                del self.df[term]
+        self.total_docs -= 1
+
+    def remove_report(self, report_id: str) -> None:
+        """Remove every indexed chunk belonging to a report."""
+        document_ids = [
+            doc_id
+            for doc_id, document in self.documents.items()
+            if document.report_id == report_id
+        ]
+        for doc_id in document_ids:
+            self.remove_document(doc_id)
 
     def search(
         self,

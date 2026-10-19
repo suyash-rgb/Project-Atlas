@@ -318,3 +318,39 @@ def get_db_connection(*, readonly: bool = False):
         (time.perf_counter() - started_at) * 1000,
     )
     return SQLiteConnectionWrapper(raw_conn)
+
+
+def upsert_report_metadata(
+    report_id: str,
+    title: str,
+    publisher: str,
+    published_date: str,
+    sector: str,
+    access_tier: str,
+) -> None:
+    """Persist report metadata without granting client entitlements."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id FROM reports WHERE id = %s", (report_id,))
+        if cursor.fetchone():
+            cursor.execute(
+                "UPDATE reports SET title = %s, publisher = %s, published = %s, "
+                "sector = %s, access = %s WHERE id = %s",
+                (title, publisher, published_date, sector, access_tier, report_id),
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO reports (id, title, publisher, published, sector, access) "
+                "VALUES (%s, %s, %s, %s, %s, %s)",
+                (report_id, title, publisher, published_date, sector, access_tier),
+            )
+        conn.commit()
+        logger.info("report_metadata_persisted report_id=%s", report_id)
+    except Exception:
+        conn.rollback()
+        logger.exception("report_metadata_persist_failed report_id=%s", report_id)
+        raise
+    finally:
+        cursor.close()
+        conn.close()

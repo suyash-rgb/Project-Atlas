@@ -8,9 +8,11 @@ Features:
 """
 
 import os
+import hashlib
 import logging
 import chromadb
-from typing import List, Dict, Any, Optional
+import pymupdf
+from typing import List, Dict, Any, Optional, Sequence, Tuple
 from pydantic import BaseModel
 import pypdf
 
@@ -20,15 +22,15 @@ from llama_index.embeddings.fastembed import FastEmbedEmbedding
 from llama_index.vector_stores.chroma import ChromaVectorStore
 from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, FilterOperator
 
-from app.core.config import REPOSITORY_ROOT, settings
+from app.core.config import settings
 from app.core.observability import observe_with_tags
 from app.db.session import get_db_connection
 from app.agent.tools.hybrid import TFIDFIndex, reciprocal_rank_fusion
 from app.agent.tools.reranker import get_reranker
 from app.agent.tools.chart_extractor import extract_and_summarize_charts_from_pdf
 
-CHROMA_PATH = str(getattr(settings, "CHROMA_DB_PATH", None) or (REPOSITORY_ROOT / "data" / "chroma_db"))
-REPORTS_DIR = str(getattr(settings, "REPORTS_DIR", None) or (REPOSITORY_ROOT / "data" / "reports"))
+CHROMA_PATH = settings.CHROMA_PERSIST_DIRECTORY
+REPORTS_DIR = settings.REPORTS_DIR
 COLLECTION_NAME = "project_atlas_reports"
 logger = logging.getLogger("project_atlas.retriever")
 
@@ -37,6 +39,11 @@ Settings.embed_model = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
 Settings.node_parser = SentenceSplitter(chunk_size=512, chunk_overlap=64)
 
 _RUNTIME_REPORT_REGISTRY: Dict[str, Dict[str, Any]] = {}
+
+
+def _stable_document_id(report_id: str, page: int, text: str, kind: str = "text") -> str:
+    digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:24]
+    return f"{report_id}_{page}_{kind}_{digest}"
 
 
 def register_runtime_report(report_id: str, metadata: Dict[str, Any]) -> None:
@@ -170,25 +177,60 @@ class EntitlementRetriever:
 
 
     def ingest_reports(self, force_reload: bool = False) -> int:
-        current_count = self._collection.count()
-        if current_count > 0 and not force_reload:
-            logger.info("report_ingestion_skipped reason=collection_populated chunks=%s", current_count)
+        collection = self._collection
+        if collection is None:
+            raise RuntimeError("The report vector collection is not initialized.")
+        current_count = collection.count()
+
+        if not os.path.isdir(REPORTS_DIR):
+            raise RuntimeError(f"Report directory does not exist: {REPORTS_DIR}")
+
+        pdf_files = [
+            f for f in os.listdir(REPORTS_DIR)
+            if f.lower().endswith(".pdf")
+        ]
+        expected_report_ids = {filename.split("_")[0] for filename in pdf_files}
+        indexed_metadata = collection.get(include=["metadatas"]).get("metadatas") or []
+        indexed_report_ids = {
+            str(item.get("report_id"))
+            for item in indexed_metadata
+            if item and item.get("report_id")
+        }
+        indexed_chart_report_ids = {
+            str(item.get("report_id"))
+            for item in indexed_metadata
+            if item and item.get("type") == "chart" and item.get("report_id")
+        }
+        expected_chart_report_ids = set()
+        for filename in pdf_files:
+            pdf_path = os.path.join(REPORTS_DIR, filename)
+            with pymupdf.open(pdf_path) as pdf:
+                if any(page.get_images(full=True) for page in pdf):
+                    expected_chart_report_ids.add(filename.split("_")[0])
+
+        target_report_ids = (
+            expected_report_ids - indexed_report_ids
+        ) | (
+            expected_chart_report_ids - indexed_chart_report_ids
+        )
+        if current_count > 0 and not force_reload and not target_report_ids:
+            logger.info(
+                "report_ingestion_skipped reason=corpus_already_indexed chunks=%s reports=%s",
+                current_count,
+                len(expected_report_ids),
+            )
             return current_count
 
-        if force_reload and current_count > 0:
-            logger.warning("report_ingestion_force_reload deleting_existing_chunks=%s", current_count)
-            self._chroma_client.delete_collection(COLLECTION_NAME)
-            self._collection = self._chroma_client.get_or_create_collection(COLLECTION_NAME)
-            vector_store = ChromaVectorStore(chroma_collection=self._collection)
-            self._index = VectorStoreIndex.from_vector_store(vector_store)
-            self._sparse_index = TFIDFIndex()
+        if force_reload:
+            target_report_ids = expected_report_ids
 
-        pdf_files = [f for f in os.listdir(REPORTS_DIR) if f.endswith(".pdf")]
         documents = []
 
         logger.info("report_ingestion_started files=%s", len(pdf_files))
-        for filename in pdf_files:
+        for filename in sorted(pdf_files):
             report_id = filename.split("_")[0]
+            if current_count > 0 and not force_reload and report_id not in target_report_ids:
+                continue
             report_meta = fetch_report_metadata(report_id)
 
             file_path = os.path.join(REPORTS_DIR, filename)
@@ -201,6 +243,7 @@ class EntitlementRetriever:
 
                     doc = Document(
                         text=page_text,
+                        id_=_stable_document_id(report_id, page_num, page_text),
                         metadata={
                             "report_id": report_id,
                             "page": page_num,
@@ -224,6 +267,12 @@ class EntitlementRetriever:
                     for c_info in chart_chunks:
                         c_doc = Document(
                             text=c_info["text"],
+                            id_=_stable_document_id(
+                                report_id,
+                                c_info["page"],
+                                c_info["text"],
+                                kind="chart",
+                            ),
                             metadata={
                                 "report_id": report_id,
                                 "page": c_info["page"],
@@ -252,18 +301,39 @@ class EntitlementRetriever:
             logger.error("report_ingestion_failed reason=no_documents files=%s", len(pdf_files))
             raise RuntimeError("No report pages were available to index.")
 
+        if force_reload and current_count > 0:
+            logger.warning("report_ingestion_force_reload deleting_existing_chunks=%s", current_count)
+            chroma_client = self._chroma_client
+            if chroma_client is None:
+                raise RuntimeError("The Chroma client is not initialized.")
+            collection_name = collection.name
+            chroma_client.delete_collection(collection_name)
+            collection = chroma_client.get_or_create_collection(collection_name)
+            self._collection = collection
+            self._sparse_index = TFIDFIndex()
+        elif current_count > 0:
+            for report_id in target_report_ids:
+                collection.delete(where={"report_id": report_id})
+                if self._sparse_index is not None:
+                    self._sparse_index.remove_report(report_id)
+
+        collection = self._collection
+        if collection is None:
+            raise RuntimeError("The report vector collection is not initialized.")
         logger.info("report_index_build_started documents=%s", len(documents))
         self._index = VectorStoreIndex.from_documents(
             documents,
-            storage_context=StorageContext.from_defaults(vector_store=ChromaVectorStore(chroma_collection=self._collection)),
+            storage_context=StorageContext.from_defaults(
+                vector_store=ChromaVectorStore(chroma_collection=collection)
+            ),
             show_progress=True
         )
-        total_chunks = self._collection.count() if self._collection is not None else len(documents)
+        total_chunks = collection.count()
         if self._sparse_index is not None:
-            for idx, doc in enumerate(documents):
+            for doc in documents:
                 meta = doc.metadata or {}
                 self._sparse_index.add_document(
-                    doc_id=f"{meta.get('report_id')}_{meta.get('page')}_{idx}",
+                    doc_id=doc.id_,
                     report_id=str(meta.get("report_id", "UNKNOWN")),
                     page=int(str(meta.get("page", 1))),
                     text=doc.text,
@@ -286,25 +356,31 @@ class EntitlementRetriever:
         published_date: str,
         sector: str,
         access_tier: str,
-        content: str
+        content: str,
+        pages: Optional[Sequence[Tuple[int, str]]] = None,
     ) -> int:
         """
-        Ingests and indexes document content chunks in ChromaDB with metadata.
+        Ingest page-aware text chunks. Unpaginated content is treated as one source page.
         """
-        paragraphs = [p.strip() for p in content.split("\n\n") if len(p.strip()) >= 20]
-        if not paragraphs:
-            paragraphs = [content.strip()] if content.strip() else []
-
-        if not paragraphs:
+        source_pages = list(pages) if pages else [(1, content)]
+        page_paragraphs = [
+            (page_number, paragraph.strip())
+            for page_number, page_content in source_pages
+            for paragraph in page_content.split("\n\n")
+            if paragraph.strip()
+        ]
+        if not page_paragraphs:
             return 0
 
         documents = []
-        for idx, para in enumerate(paragraphs, start=1):
+        for page_number, para in page_paragraphs:
+            document_id = _stable_document_id(report_id, page_number, para)
             doc = Document(
                 text=para,
+                id_=document_id,
                 metadata={
                     "report_id": report_id,
-                    "page": idx,
+                    "page": page_number,
                     "title": title,
                     "publisher": publisher,
                     "published": published_date,
@@ -328,16 +404,42 @@ class EntitlementRetriever:
             "coverage": f"{sector} market coverage"
         })
 
-        if self._index is not None:
-            for d in documents:
-                self._index.insert(d)
+        existing_ids: set[str] = set()
+        if self._index is not None and self._collection is not None:
+            existing = self._collection.get(
+                where={"report_id": report_id},
+                include=["metadatas"],
+            )
+            existing_ids = set(existing.get("ids") or [])
+            try:
+                for document in documents:
+                    self._index.insert(document)
+            except Exception:
+                current = self._collection.get(
+                    where={"report_id": report_id},
+                    include=["metadatas"],
+                )
+                added_ids = set(current.get("ids") or []) - existing_ids
+                if added_ids:
+                    self._collection.delete(ids=list(added_ids))
+                logger.exception("document_vector_ingestion_failed report_id=%s", report_id)
+                raise
+
+            current = self._collection.get(
+                where={"report_id": report_id},
+                include=["metadatas"],
+            )
+            stale_ids = existing_ids.intersection(set(current.get("ids") or []))
+            if stale_ids:
+                self._collection.delete(ids=list(stale_ids))
 
         if self._sparse_index is not None:
-            for idx, d in enumerate(documents, start=1):
+            self._sparse_index.remove_report(report_id)
+            for d in documents:
                 self._sparse_index.add_document(
-                    doc_id=f"{report_id}_p{idx}_{d.text[:20]}",
+                    doc_id=d.id_,
                     report_id=report_id,
-                    page=idx,
+                    page=int(d.metadata["page"]),
                     text=d.text,
                     title=title,
                     sector=sector,
@@ -439,7 +541,8 @@ class EntitlementRetriever:
         # 3. Reciprocal Rank Fusion (RRF)
         if sparse_chunks and dense_chunks:
             def _chunk_key(c: RetrievedChunk) -> str:
-                return f"{c.report_id}::p{c.page}::{c.text.strip()[:60]}"
+                content_hash = hashlib.sha256(c.text.encode("utf-8")).hexdigest()
+                return f"{c.report_id}::p{c.page}::{content_hash}"
 
             fused = reciprocal_rank_fusion(
                 dense_items=dense_chunks,

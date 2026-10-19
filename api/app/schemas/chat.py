@@ -1,6 +1,7 @@
+from datetime import date, datetime, timezone
+from typing import Any, Dict, List, Literal, Optional
+
 from pydantic import BaseModel, Field, model_validator
-from typing import List, Optional, Any, Dict
-from datetime import datetime, timezone
 
 
 # --- Request Schemas ---
@@ -26,14 +27,42 @@ class ChatRequest(BaseModel):
         return data
 
 
+class IngestPage(BaseModel):
+    page_number: int = Field(..., ge=1, description="One-based source PDF page number")
+    content: str = Field(..., min_length=1, max_length=2_000_000)
+
+
 class IngestRequest(BaseModel):
-    report_id: str = Field(..., description="Report identifier, e.g. R-101")
-    title: str = Field(...)
-    publisher: str = Field(...)
-    published_date: str = Field(...)
-    sector: str = Field(...)
-    access_tier: str = Field(..., description="'paid' or 'public'")
-    content: str = Field(..., description="Full text or markdown content of the report")
+    report_id: str = Field(..., min_length=1, max_length=32, description="Report identifier, e.g. R-101")
+    title: str = Field(..., min_length=1, max_length=255)
+    publisher: str = Field(..., min_length=1, max_length=255)
+    published_date: date
+    sector: str = Field(..., min_length=1, max_length=128)
+    access_tier: Literal["paid", "public", "public excerpt"] = Field(
+        ..., description="'paid' or 'public'"
+    )
+    content: Optional[str] = Field(
+        None,
+        max_length=2_000_000,
+        description="Unpaginated text or markdown content (treated as one source page)",
+    )
+    pages: Optional[List[IngestPage]] = Field(
+        None,
+        max_length=2000,
+        description="Page-aware content for citations to the original report",
+    )
+
+    @model_validator(mode="after")
+    def validate_content_source(self):
+        if self.content is not None and self.pages is not None:
+            raise ValueError("Provide either content or pages, not both.")
+        if self.content is None and self.pages is None:
+            raise ValueError("Provide content or page-aware content.")
+        if self.pages is not None:
+            total_length = sum(len(page.content) for page in self.pages)
+            if total_length > 2_000_000:
+                raise ValueError("Combined page content cannot exceed 2,000,000 characters.")
+        return self
 
 
 class IngestResponse(BaseModel):
