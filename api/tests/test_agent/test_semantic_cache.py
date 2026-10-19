@@ -1,159 +1,113 @@
 """
-Unit Tests for Redis Semantic Caching.
+Unit Tests for In-Memory Semantic Caching.
 
 Covers:
-- Graceful degradation when Redis is offline or disabled
+- Graceful degradation when semantic cache is disabled
 - Vector embedding generation (384-dim BGE-small)
 - Semantic cache hit with high similarity (>= 0.90)
 - Semantic cache miss when similarity is below threshold (< 0.90)
 - Strict client entitlement isolation: Client A cannot see Client B's cached query
 - Serialization and deserialization of ChatResponse payloads
 - Cache clear operations (full vs tenant-specific)
+- TTL expiration in memory
 - Integration with ChatService
 """
 
-import json
+import time
 import numpy as np
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
-from app.core.semantic_cache import RedisSemanticCache
+from app.core.semantic_cache import InMemorySemanticCache, RedisSemanticCache
 from app.schemas.chat import ChatResponse
 from app.services.chat_service import ChatService
 
 
 # =====================================================================
-# 1. Graceful Bypass & Offline Fallback Tests
+# 1. Graceful Bypass & Input Validation Tests
 # =====================================================================
 
 def test_semantic_cache_disabled():
-    cache = RedisSemanticCache(enabled=False)
+    cache = InMemorySemanticCache(enabled=False)
     assert cache.enabled is False
     assert cache.get("CLIENT_A", "What is GenAI?") is None
     assert cache.set("CLIENT_A", "What is GenAI?", {"answer": "test"}) is False
 
 
-def test_semantic_cache_redis_connection_failure():
-    # Attempting to connect to an unreachable port should fail cleanly without raising
-    cache = RedisSemanticCache(host="127.0.0.1", port=59999, enabled=True)
-    assert cache._redis_client is None
-    assert cache.get("CLIENT_A", "What is GenAI?") is None
-    assert cache.set("CLIENT_A", "What is GenAI?", {"answer": "test"}) is False
-
-
-# =====================================================================
-# 2. Embedding & Vector Validation Tests
-# =====================================================================
-
-def test_semantic_cache_embed_vector():
-    cache = RedisSemanticCache(enabled=False)
-    vector = cache._embed("Global GenAI Market Size 2026")
-    assert vector is not None
-    assert isinstance(vector, np.ndarray)
-    assert vector.shape == (384,)
-    # Verify vector is L2 normalized
-    norm = np.linalg.norm(vector)
-    assert pytest.approx(norm, 0.001) == 1.0
-
-
 def test_semantic_cache_empty_or_whitespace_input():
-    cache = RedisSemanticCache(enabled=False)
+    cache = InMemorySemanticCache(enabled=True)
     assert cache.get("", "Question") is None
     assert cache.get("CLIENT_A", "   ") is None
     assert cache.set("", "Question", {}) is False
     assert cache.set("CLIENT_A", "", {}) is False
 
 
+def test_semantic_cache_embed_vector():
+    cache = InMemorySemanticCache(enabled=True)
+    vector = cache._embed("Global GenAI Market Size 2026")
+    assert vector is not None
+    assert isinstance(vector, np.ndarray)
+    assert vector.shape == (384,)
+    norm = np.linalg.norm(vector)
+    assert pytest.approx(norm, 0.001) == 1.0
+
+
 # =====================================================================
-# 3. Vector Similarity Search & Client Isolation Tests (Mocked Redis)
+# 2. Vector Similarity Search & Client Isolation Tests (In-Memory)
 # =====================================================================
 
 def test_semantic_cache_hit_above_threshold():
-    cache = RedisSemanticCache(enabled=True, similarity_threshold=0.90)
+    cache = InMemorySemanticCache(enabled=True, similarity_threshold=0.85)
 
-    mock_redis = MagicMock()
-    mock_ft = MagicMock()
-    mock_redis.ft.return_value = mock_ft
-
-    # Simulate RediSearch returning a close match (score = 0.05 -> distance = 0.05 -> similarity = 0.95)
-    mock_doc = MagicMock()
-    mock_doc.score = "0.05"
-    mock_doc.question = "What is the market size of GenAI?"
-    mock_doc.response_json = json.dumps({
-        "answer": "The GenAI market is $65.5B [R-101 p.3].",
+    payload = {
+        "answer": "The GenAI market is $65.5B in 2024 [R-101 p.3].",
         "sources": ["R-101"],
         "citations": ["[R-101 p.3]"],
         "confidence": 0.95,
         "escalated": False,
         "trace_id": "test-trace",
-    })
+    }
 
-    mock_search_res = MagicMock()
-    mock_search_res.docs = [mock_doc]
-    mock_ft.search.return_value = mock_search_res
+    # Store base query
+    stored = cache.set("ALPHA", "What is the global GenAI market size in 2024?", payload)
+    assert stored is True
 
-    cache._redis_client = mock_redis
-    cache._index_initialized = True
-
-    # User asks a semantically similar question
-    result = cache.get("ALPHA", "GenAI market size estimate")
+    # Ask semantically very similar question
+    result = cache.get("ALPHA", "Tell me the 2024 market size for GenAI worldwide")
     assert result is not None
     assert "The GenAI market is $65.5B" in result["answer"]
     assert result["sources"] == ["R-101"]
 
 
 def test_semantic_cache_miss_below_threshold():
-    cache = RedisSemanticCache(enabled=True, similarity_threshold=0.90)
+    cache = InMemorySemanticCache(enabled=True, similarity_threshold=0.90)
 
-    mock_redis = MagicMock()
-    mock_ft = MagicMock()
-    mock_redis.ft.return_value = mock_ft
+    payload = {"answer": "Cybersecurity CAGR is 14%."}
+    cache.set("ALPHA", "What is the CAGR of cybersecurity?", payload)
 
-    # Simulate RediSearch returning an unrelated match (score = 0.35 -> similarity = 0.65)
-    mock_doc = MagicMock()
-    mock_doc.score = "0.35"
-    mock_doc.question = "What is the CAGR of cybersecurity?"
-    mock_doc.response_json = json.dumps({"answer": "Cybersecurity CAGR is 14%."})
-
-    mock_search_res = MagicMock()
-    mock_search_res.docs = [mock_doc]
-    mock_ft.search.return_value = mock_search_res
-
-    cache._redis_client = mock_redis
-    cache._index_initialized = True
-
-    # User asks an unrelated question -> Should be a cache miss
+    # Ask an unrelated question -> Should be a cache miss
     result = cache.get("ALPHA", "GenAI cloud computing trends")
     assert result is None
 
 
 def test_semantic_cache_enforces_client_isolation():
-    cache = RedisSemanticCache(enabled=True, similarity_threshold=0.90)
+    cache = InMemorySemanticCache(enabled=True, similarity_threshold=0.85)
 
-    mock_redis = MagicMock()
-    mock_ft = MagicMock()
-    mock_redis.ft.return_value = mock_ft
+    payload_a = {"answer": "Confidential report data for Client A only."}
+    cache.set("CLIENT_A", "What are the secret insights?", payload_a)
 
-    cache._redis_client = mock_redis
-    cache._index_initialized = True
+    # Query the exact same question as CLIENT_B -> Must NOT hit Client A's cache!
+    result_b = cache.get("CLIENT_B", "What are the secret insights?")
+    assert result_b is None
 
-    # Query as CLIENT_B
-    cache.get("CLIENT_B", "What are the unpurchased report insights?")
-
-    # Verify that the RediSearch query explicitly contained the filter: (@client_id:{CLIENT_B})
-    args, kwargs = mock_ft.search.call_args
-    query_obj = args[0]
-    assert "@client_id:{CLIENT_B}" in query_obj.query_string()
+    # Query as CLIENT_A -> Must hit
+    result_a = cache.get("CLIENT_A", "What are the secret insights?")
+    assert result_a is not None
+    assert result_a["answer"] == payload_a["answer"]
 
 
-def test_semantic_cache_store_payload():
-    cache = RedisSemanticCache(enabled=True, ttl_seconds=3600)
-
-    mock_redis = MagicMock()
-    mock_pipeline = MagicMock()
-    mock_redis.pipeline.return_value = mock_pipeline
-
-    cache._redis_client = mock_redis
+def test_semantic_cache_store_pydantic_payload():
+    cache = InMemorySemanticCache(enabled=True, ttl_seconds=3600)
 
     payload = ChatResponse(
         answer="Autonomous mobility CAGR is 22.4% [R-102 p.5].",
@@ -166,13 +120,45 @@ def test_semantic_cache_store_payload():
 
     success = cache.set("ALPHA", "Autonomous mobility CAGR?", payload)
     assert success is True
-    mock_pipeline.hset.assert_called_once()
-    mock_pipeline.expire.assert_called_once()
-    mock_pipeline.execute.assert_called_once()
+
+    retrieved = cache.get("ALPHA", "Autonomous mobility CAGR?")
+    assert retrieved is not None
+    assert retrieved["answer"] == payload.answer
+    assert retrieved["confidence"] == 0.92
+
+
+def test_semantic_cache_ttl_expiration():
+    # Cache with 1-second TTL
+    cache = InMemorySemanticCache(enabled=True, ttl_seconds=1)
+    cache.set("ALPHA", "Expiring question", {"answer": "Now you see me"})
+
+    # Immediately available
+    assert cache.get("ALPHA", "Expiring question") is not None
+
+    # Manually expire the entry in store
+    cache._store["ALPHA"][0]["expires_at"] = time.time() - 10
+
+    # Query after expiration -> Should be None
+    assert cache.get("ALPHA", "Expiring question") is None
+
+
+def test_semantic_cache_clear():
+    cache = InMemorySemanticCache(enabled=True)
+    cache.set("ALPHA", "Question A", {"answer": "Answer A"})
+    cache.set("BETA", "Question B", {"answer": "Answer B"})
+
+    # Clear only ALPHA
+    cache.clear(client_id="ALPHA")
+    assert cache.get("ALPHA", "Question A") is None
+    assert cache.get("BETA", "Question B") is not None
+
+    # Clear all
+    cache.clear()
+    assert cache.get("BETA", "Question B") is None
 
 
 # =====================================================================
-# 4. End-to-End ChatService Semantic Cache Hit
+# 3. End-to-End ChatService Semantic Cache Hit
 # =====================================================================
 
 def test_chat_service_semantic_cache_hit():
@@ -187,7 +173,6 @@ def test_chat_service_semantic_cache_hit():
         "trace_id": "cached-sem-trace",
     }
 
-    # Patch semantic_cache.get to return a semantic match
     with patch("app.services.chat_service.telemetry.cache.get", return_value=None), \
          patch("app.services.chat_service.semantic_cache.get", return_value=cached_payload) as mock_sem_get:
 

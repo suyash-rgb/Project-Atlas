@@ -345,7 +345,6 @@ def synthesizer_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any
 
     return {"final_response": response}
 
-
 # --- Routing Conditions ---
 
 def route_after_guardrail(state: AgentState) -> str:

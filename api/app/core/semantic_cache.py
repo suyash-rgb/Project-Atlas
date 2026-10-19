@@ -1,15 +1,17 @@
 """
-Redis Semantic Cache Module with Client Entitlement Scoping & Vector Search.
+In-Memory Semantic Cache Module with Client Entitlement Scoping & Vector Search.
 
 Features:
-- Sub-millisecond similarity caching using RediSearch Vector Similarity Search (HNSW).
+- Sub-millisecond similarity caching using FastEmbed (BGE-small 384-dim) and NumPy vector dot-product.
 - Strict Client Isolation: Caches are partitioned by client_id to prevent entitlement leakage.
-- Cosine Distance Thresholding: Only semantic hits exceeding the similarity threshold (e.g. >= 0.90) are served.
-- Graceful Degradation: If Redis is unavailable or unconfigured, falls back cleanly to None without failing requests.
+- Cosine Similarity Thresholding: Only semantic hits exceeding the similarity threshold (e.g. >= 0.90) are served.
+- TTL Expiration & Thread-Safety: Automatic timestamp expiration and lock-protected updates.
+- Zero External Dependencies: Runs entirely in Python RAM without requiring Redis or Docker.
 """
 
 import json
 import logging
+import threading
 import time
 from typing import Optional, Dict, Any, List
 import numpy as np
@@ -34,125 +36,79 @@ def get_embedding_model():
     return _EMBED_MODEL
 
 
-class RedisSemanticCache:
+class InMemorySemanticCache:
     """
-    Semantic Cache powered by Redis RediSearch Vector Indexing.
-    Stores and queries embeddings of questions scoped by client_id.
+    High-performance, in-memory semantic cache using vectorized cosine similarity.
+    Stores and queries embeddings of questions scoped strictly by client_id.
     """
 
-    INDEX_NAME = "idx:atlas_semantic_cache"
-    PREFIX = "cache:atlas:"
     VECTOR_DIM = 384
+    MAX_ENTRIES_PER_CLIENT = 500
 
     def __init__(
         self,
-        host: Optional[str] = None,
-        port: Optional[int] = None,
-        password: Optional[str] = None,
-        db: Optional[int] = None,
         similarity_threshold: Optional[float] = None,
         ttl_seconds: Optional[int] = None,
         enabled: Optional[bool] = None,
+        **_kwargs,  # Gracefully accept host, port, etc., for backward compatibility
     ):
-        self.host = host or getattr(settings, "REDIS_HOST", "localhost")
-        self.port = port or getattr(settings, "REDIS_PORT", 6379)
-        self.password = password or getattr(settings, "REDIS_PASSWORD", None)
-        self.db = db if db is not None else getattr(settings, "REDIS_DB", 0)
-        self.threshold = similarity_threshold if similarity_threshold is not None else getattr(settings, "SEMANTIC_CACHE_THRESHOLD", 0.90)
-        self.ttl_seconds = ttl_seconds or getattr(settings, "SEMANTIC_CACHE_TTL_SECONDS", 86400)
-        self.enabled = enabled if enabled is not None else getattr(settings, "SEMANTIC_CACHE_ENABLED", True)
+        self.threshold = (
+            similarity_threshold
+            if similarity_threshold is not None
+            else getattr(settings, "SEMANTIC_CACHE_THRESHOLD", 0.90)
+        )
+        self.ttl_seconds = (
+            ttl_seconds
+            if ttl_seconds is not None
+            else getattr(settings, "SEMANTIC_CACHE_TTL_SECONDS", 86400)
+        )
+        self.enabled = (
+            enabled
+            if enabled is not None
+            else getattr(settings, "SEMANTIC_CACHE_ENABLED", True)
+        )
 
-        self._redis_client = None
-        self._index_initialized = False
+        # Storage structure: { clean_client_id: [ {"question": str, "vector": np.ndarray, "response": dict, "expires_at": float} ] }
+        self._store: Dict[str, List[Dict[str, Any]]] = {}
+        self._lock = threading.Lock()
 
-        if self.enabled:
-            self._connect()
-
-    def _connect(self):
-        """Attempts connection to Redis."""
-        try:
-            import redis
-            self._redis_client = redis.Redis(
-                host=self.host,
-                port=self.port,
-                password=self.password,
-                db=self.db,
-                decode_responses=False,  # Keep binary support for vectors
-                socket_timeout=2.0,
-                socket_connect_timeout=2.0,
-            )
-            # Ping to verify active connection
-            self._redis_client.ping()
-            self._ensure_index()
-            logger.info("redis_semantic_cache_connected host=%s port=%s", self.host, self.port)
-        except Exception as exc:
-            logger.warning("redis_connection_failed host=%s port=%s error=%s (operating in bypass mode)", self.host, self.port, exc)
-            self._redis_client = None
-
-    def _ensure_index(self):
-        """Ensures RediSearch vector index exists with client_id tag and question_vector."""
-        if not self._redis_client or self._index_initialized:
-            return
-
-        try:
-            from redis.commands.search.field import TagField, TextField, VectorField
-            from redis.commands.search.index_definition import IndexDefinition, IndexType
-
-            try:
-                self._redis_client.ft(self.INDEX_NAME).info()
-                self._index_initialized = True
-                return
-            except Exception:
-                pass  # Index does not exist, create it
-
-            schema = (
-                TagField("client_id"),
-                TextField("question"),
-                TextField("response_json"),
-                VectorField(
-                    "question_vector",
-                    "HNSW",
-                    {
-                        "TYPE": "FLOAT32",
-                        "DIM": self.VECTOR_DIM,
-                        "DISTANCE_METRIC": "COSINE",
-                    },
-                ),
-            )
-            definition = IndexDefinition(prefix=[self.PREFIX], index_type=IndexType.HASH)
-            self._redis_client.ft(self.INDEX_NAME).create_index(schema, definition=definition)
-            self._index_initialized = True
-            logger.info("redis_semantic_cache_index_created name=%s", self.INDEX_NAME)
-        except Exception as exc:
-            logger.warning("redis_index_init_failed error=%s (will use key fallback)", exc)
+        logger.info(
+            "in_memory_semantic_cache_initialized threshold=%.2f ttl_seconds=%d enabled=%s",
+            self.threshold,
+            self.ttl_seconds,
+            self.enabled,
+        )
 
     def _embed(self, text: str) -> Optional[np.ndarray]:
         """Calculates 384-dimensional normalized float32 embedding."""
+        clean_text = text.strip() if text else ""
+        if not clean_text:
+            return None
+
         model = get_embedding_model()
         if model is None:
             return None
         try:
-            embedding = list(model.embed([text]))[0]
+            embedding = list(model.embed([clean_text]))[0]
             vector = np.array(embedding, dtype=np.float32)
-            # Normalize vector for cosine distance
             norm = np.linalg.norm(vector)
             if norm > 0:
                 vector = vector / norm
             return vector
         except Exception as exc:
-            logger.warning("embed_question_failed text_len=%s error=%s", len(text), exc)
+            logger.warning("embed_question_failed text_len=%s error=%s", len(clean_text), exc)
             return None
 
     def get(self, client_id: str, question: str) -> Optional[Dict[str, Any]]:
         """
-        Queries Redis semantic cache for the closest match for this specific client_id.
+        Queries in-memory semantic cache for the closest match for this specific client_id.
         Returns parsed response dict if cosine similarity >= threshold, else None.
         """
-        if not self.enabled or not self._redis_client:
+        if not self.enabled:
             return None
 
-        clean_client = client_id.strip().upper()
-        clean_q = question.strip()
+        clean_client = client_id.strip().upper() if client_id else ""
+        clean_q = question.strip() if question else ""
         if not clean_client or not clean_q:
             return None
 
@@ -160,67 +116,53 @@ class RedisSemanticCache:
         if query_vector is None:
             return None
 
-        try:
-            from redis.commands.search.query import Query
-
-            # Filter strictly by client_id tag and execute KNN search
-            # Cosine distance = 1 - cosine_similarity.
-            # Max allowable distance = 1 - self.threshold
-            max_distance = round(1.0 - self.threshold, 4)
-
-            q_str = f"(@client_id:{{{clean_client}}})=>[KNN 1 @question_vector $vec AS score]"
-            q = (
-                Query(q_str)
-                .sort_by("score")
-                .return_fields("score", "question", "response_json")
-                .paging(0, 1)
-                .dialect(2)
-            )
-
-            res = self._redis_client.ft(self.INDEX_NAME).search(
-                q, query_params={"vec": query_vector.tobytes()}
-            )
-
-            if not res or not res.docs:
+        now = time.time()
+        with self._lock:
+            client_entries = self._store.get(clean_client, [])
+            if not client_entries:
                 return None
 
-            best_doc = res.docs[0]
-            distance = float(best_doc.score)
-            similarity = 1.0 - distance
+            # Filter out expired items
+            valid_entries = [e for e in client_entries if e["expires_at"] > now]
+            if len(valid_entries) != len(client_entries):
+                self._store[clean_client] = valid_entries
+            if not valid_entries:
+                return None
 
-            if similarity >= self.threshold:
+            # Vectorized Cosine Similarity: dot product of normalized vectors
+            vectors = np.array([e["vector"] for e in valid_entries], dtype=np.float32)
+            similarities = np.dot(vectors, query_vector)
+
+            best_idx = int(np.argmax(similarities))
+            best_sim = float(similarities[best_idx])
+
+            if best_sim >= self.threshold:
+                matched_entry = valid_entries[best_idx]
                 logger.info(
-                    "semantic_cache_hit client_id=%s similarity=%.4f matched_q='%s'",
+                    "in_memory_semantic_cache_hit client_id=%s similarity=%.4f matched_q='%s'",
                     clean_client,
-                    similarity,
-                    getattr(best_doc, "question", "")[:50],
+                    best_sim,
+                    matched_entry["question"][:50],
                 )
-                raw_json = getattr(best_doc, "response_json", "{}")
-                if isinstance(raw_json, bytes):
-                    raw_json = raw_json.decode("utf-8")
-                return json.loads(raw_json)
+                return matched_entry["response"]
             else:
                 logger.debug(
-                    "semantic_cache_miss_subthreshold client_id=%s similarity=%.4f threshold=%.2f",
+                    "in_memory_semantic_cache_miss client_id=%s max_similarity=%.4f threshold=%.2f",
                     clean_client,
-                    similarity,
+                    best_sim,
                     self.threshold,
                 )
                 return None
 
-        except Exception as exc:
-            logger.debug("semantic_cache_query_exception error=%s", exc)
-            return None
-
     def set(self, client_id: str, question: str, response_payload: Any) -> bool:
         """
-        Saves question embedding, client_id, and serialized response into Redis.
+        Saves question embedding, client_id, and serialized response into memory.
         """
-        if not self.enabled or not self._redis_client:
+        if not self.enabled:
             return False
 
-        clean_client = client_id.strip().upper()
-        clean_q = question.strip()
+        clean_client = client_id.strip().upper() if client_id else ""
+        clean_q = question.strip() if question else ""
         if not clean_client or not clean_q:
             return False
 
@@ -228,62 +170,60 @@ class RedisSemanticCache:
         if query_vector is None:
             return False
 
-        try:
-            import hashlib
-            doc_id = hashlib.sha256(f"{clean_client}::{clean_q}".encode("utf-8")).hexdigest()
-            key = f"{self.PREFIX}{doc_id}"
+        if hasattr(response_payload, "model_dump"):
+            resp_dict = response_payload.model_dump()
+        elif hasattr(response_payload, "dict"):
+            resp_dict = response_payload.dict()
+        elif isinstance(response_payload, dict):
+            resp_dict = response_payload
+        else:
+            resp_dict = {"answer": str(response_payload)}
 
-            if hasattr(response_payload, "model_dump"):
-                resp_dict = response_payload.model_dump()
-            elif hasattr(response_payload, "dict"):
-                resp_dict = response_payload.dict()
-            elif isinstance(response_payload, dict):
-                resp_dict = response_payload
-            else:
-                resp_dict = {"answer": str(response_payload)}
+        expires_at = time.time() + (self.ttl_seconds if self.ttl_seconds > 0 else 86400)
 
-            payload_str = json.dumps(resp_dict)
+        entry = {
+            "question": clean_q,
+            "vector": query_vector,
+            "response": resp_dict,
+            "expires_at": expires_at,
+        }
 
-            pipe = self._redis_client.pipeline()
-            pipe.hset(
-                key,
-                mapping={
-                    "client_id": clean_client,
-                    "question": clean_q,
-                    "response_json": payload_str,
-                    "question_vector": query_vector.tobytes(),
-                    "created_at": time.time(),
-                },
+        with self._lock:
+            if clean_client not in self._store:
+                self._store[clean_client] = []
+
+            # Deduplicate if exact same question is already present
+            existing_idx = next(
+                (i for i, e in enumerate(self._store[clean_client]) if e["question"].lower() == clean_q.lower()),
+                None,
             )
-            if self.ttl_seconds > 0:
-                pipe.expire(key, self.ttl_seconds)
-            pipe.execute()
+            if existing_idx is not None:
+                self._store[clean_client][existing_idx] = entry
+            else:
+                if len(self._store[clean_client]) >= self.MAX_ENTRIES_PER_CLIENT:
+                    self._store[clean_client].pop(0)  # Evict oldest
+                self._store[clean_client].append(entry)
 
-            logger.info("semantic_cache_stored client_id=%s key=%s", clean_client, key)
-            return True
-        except Exception as exc:
-            logger.warning("semantic_cache_set_failed error=%s", exc)
-            return False
+        logger.info(
+            "in_memory_semantic_cache_stored client_id=%s question_length=%d total_client_cached=%d",
+            clean_client,
+            len(clean_q),
+            len(self._store[clean_client]),
+        )
+        return True
 
     def clear(self, client_id: Optional[str] = None):
         """Clears all cached entries or entries belonging to a specific client_id."""
-        if not self._redis_client:
-            return
-        try:
-            keys = self._redis_client.keys(f"{self.PREFIX}*")
-            if not keys:
-                return
+        with self._lock:
             if client_id:
-                clean_client = client_id.strip().upper().encode("utf-8")
-                for k in keys:
-                    cid = self._redis_client.hget(k, "client_id")
-                    if cid == clean_client:
-                        self._redis_client.delete(k)
+                clean_client = client_id.strip().upper()
+                self._store.pop(clean_client, None)
             else:
-                self._redis_client.delete(*keys)
-        except Exception as exc:
-            logger.warning("semantic_cache_clear_failed error=%s", exc)
+                self._store.clear()
 
+
+# Backward compatibility alias
+RedisSemanticCache = InMemorySemanticCache
 
 # Global singleton instance
-semantic_cache = RedisSemanticCache()
+semantic_cache = InMemorySemanticCache()
