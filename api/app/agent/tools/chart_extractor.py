@@ -99,7 +99,7 @@ def summarize_chart_image(
     report_id: str,
     page_num: int,
     report_title: str,
-    client: Optional[Any] = None,
+    client: Any = "AUTO",
 ) -> str:
     """
     Summarizes a chart image (accepts PIL Image, raw bytes, or base64 string).
@@ -125,10 +125,10 @@ def summarize_chart_image(
         logger.warning("summarize_chart_image_failed: unsupported image input type=%s", type(image_input))
         return ""
 
-    if client is None:
+    if client == "AUTO":
         client = get_gemini_client()
 
-    if client is None:
+    if not client:
         logger.info("gemini_client_none: returning structured fallback representation")
         return f"Visual Market Chart on Page {page_num} of {report_title} (Report {report_id})."
 
