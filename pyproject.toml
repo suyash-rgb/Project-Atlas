@@ -39,6 +39,12 @@ dependencies = [
     "sqlglot>=30.23.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+]
+
 [dependency-groups]
 dev = [
     "pytest>=8.2.0",
