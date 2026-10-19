@@ -67,16 +67,6 @@
                 <span class="badge-live-copilot">Active Agent</span>
             </h3>
         </div>
-        <div class="portal-actions">
-            <a href="javascript:void(0)" class="btn-view-library"
-                onclick="triggerQuickQuery('What reports are in your library?')">
-                <i class="fa-solid fa-database"></i> Database Summary
-            </a>
-            <a href="javascript:void(0)" class="btn-view-library"
-                onclick="triggerQuickQuery('Why do R-101 and R-102 disagree on 2024?')">
-                <i class="fa-solid fa-code-compare"></i> Compare R-101 vs R-102
-            </a>
-        </div>
     </div>
 
     <!-- 4. Main Two-Column Container -->
@@ -97,10 +87,6 @@
         <!-- Right Column: Interactive Chat Canvas -->
         <section class="chat-canvas">
             <div class="chat-canvas-header">
-                <div class="chat-status-pill">
-                    <span class="pulse-dot"></span>
-                    <span>System 1 Decision Engine Online (30s SLA)</span>
-                </div>
             </div>
 
             <!-- Message Stream -->
@@ -140,11 +126,11 @@
             <!-- Input Bar -->
             <div class="chat-canvas-footer">
                 <div class="chat-input-wrapper">
-                    <textarea id="chatInput" placeholder="Type your market research inquiry..." rows="1"></textarea>
+                    <textarea id="chatInput" placeholder="Enter your inquiry..." rows="1"></textarea>
                 </div>
                 <button class="btn-send" id="sendBtn">
-                    <span>Send</span>
-                    <i class="fa-solid fa-paper-plane"></i>
+                    <i class="fa-solid fa-compass" style="color: #00a8cc;"></i>
+                    <span>Ask Atlas</span>
                 </button>
             </div>
         </section>
