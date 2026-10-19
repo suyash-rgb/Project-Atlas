@@ -87,6 +87,20 @@ header.main-header {
     text-decoration: none;
 }
 
+.main-logo-img {
+    height: 48px;
+    width: auto;
+    max-height: 48px;
+    display: block;
+    object-fit: contain;
+    transition: transform 0.2s, opacity 0.2s;
+}
+
+.main-logo-img:hover {
+    transform: scale(1.02);
+    opacity: 0.95;
+}
+
 .logo-symbol {
     width: 44px;
     height: 44px;
@@ -1120,4 +1134,226 @@ footer.main-footer a:hover {
     color: var(--cmr-text-muted);
     line-height: 1.55;
     margin: 0;
+}
+
+/* 8. End-to-End Market Research Solution (Iceberg Section) */
+.landing-iceberg-section {
+    padding: 3rem 2.5rem 6rem 2.5rem;
+    max-width: 1240px;
+    margin: 0 auto;
+}
+
+.iceberg-container {
+    display: grid;
+    grid-template-columns: 0.9fr 1.1fr;
+    gap: 4.5rem;
+    align-items: center;
+}
+
+.iceberg-visual-wrap {
+    position: relative;
+    text-align: center;
+}
+
+.iceberg-card {
+    background: #ffffff;
+    border-radius: 24px;
+    padding: 2rem;
+    box-shadow: 0 20px 40px -10px rgba(0, 86, 179, 0.08);
+    border: 1px solid var(--cmr-border);
+    display: inline-block;
+    max-width: 440px;
+    width: 100%;
+}
+
+.iceberg-img {
+    width: 100%;
+    height: auto;
+    display: block;
+    border-radius: 16px;
+    object-fit: contain;
+}
+
+.iceberg-badge {
+    position: absolute;
+    bottom: -15px;
+    left: -15px;
+    background: linear-gradient(135deg, #0284c7 0%, #0056b3 100%);
+    color: #ffffff;
+    border-radius: 14px;
+    padding: 0.85rem 1.45rem;
+    box-shadow: 0 10px 20px -3px rgba(2, 132, 199, 0.4);
+    text-align: left;
+}
+
+.iceberg-badge .num {
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.iceberg-badge .txt {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #e0f2fe;
+    margin-top: 0.2rem;
+}
+
+.iceberg-content {
+    text-align: left;
+}
+
+.iceberg-content .tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    font-size: 0.76rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--cmr-primary-blue);
+    margin-bottom: 0.65rem;
+}
+
+.iceberg-content .tag::before {
+    content: '';
+    width: 18px;
+    height: 2px;
+    background: var(--cmr-primary-blue);
+}
+
+.iceberg-content h2 {
+    font-size: 2.35rem;
+    font-weight: 800;
+    color: var(--cmr-navy);
+    line-height: 1.2;
+    margin-bottom: 1.25rem;
+    letter-spacing: -0.02em;
+}
+
+.iceberg-intro {
+    font-size: 0.92rem;
+    color: var(--cmr-text-muted);
+    line-height: 1.65;
+    margin-bottom: 2rem;
+}
+
+.iceberg-services-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 2rem;
+}
+
+.iceberg-service-row {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.85rem 1.15rem;
+    background: #ffffff;
+    border: 1px solid var(--cmr-border);
+    border-radius: 10px;
+    transition: all 0.2s;
+    font-size: 0.88rem;
+    color: var(--cmr-text-dark);
+}
+
+.iceberg-service-row:hover {
+    border-color: var(--cmr-border-active);
+    background: #f8fafc;
+    transform: translateX(4px);
+}
+
+.iceberg-service-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #eff6ff;
+    color: var(--cmr-primary-blue);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.95rem;
+    flex-shrink: 0;
+}
+
+.iceberg-callout-box {
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+    border-left: 4px solid #00a8cc;
+    border-radius: 12px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2.25rem;
+}
+
+.iceberg-callout-title {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #0369a1;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    margin-bottom: 0.45rem;
+}
+
+.iceberg-callout-desc {
+    font-size: 0.82rem;
+    color: #475569;
+    line-height: 1.55;
+    margin: 0;
+}
+
+.iceberg-actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+}
+
+.btn-read-more {
+    background: linear-gradient(135deg, #0284c7 0%, #0056b3 100%);
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0.75rem 1.65rem;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    box-shadow: 0 4px 10px rgba(0, 86, 179, 0.25);
+    transition: all 0.2s;
+}
+
+.btn-read-more:hover {
+    background: linear-gradient(135deg, #0369a1 0%, #004494 100%);
+    transform: translateY(-2px);
+}
+
+.btn-more-services {
+    background: transparent;
+    color: #1e3a8a;
+    font-weight: 700;
+    font-size: 0.9rem;
+    padding: 0.75rem 1.65rem;
+    border-radius: 8px;
+    border: 1.5px solid #1e3a8a;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-more-services:hover {
+    background: #1e3a8a;
+    color: #ffffff;
+}
+
+@media (max-width: 992px) {
+    .iceberg-container {
+        grid-template-columns: 1fr;
+        gap: 3rem;
+    }
+
+    .iceberg-card {
+        max-width: 380px;
+    }
 }

@@ -8,7 +8,7 @@
     <title><?php echo html_escape($title); ?></title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+    <link rel="icon" type="image/png" href="<?php echo base_url('assets/images/logo.png'); ?>">
     <link rel="stylesheet" href="<?php echo base_url('assets/css/style.css'); ?>">
 </head>
 <body>
@@ -20,18 +20,14 @@
             <span><i class="fa-solid fa-envelope"></i> sales@cognitivemarketresearch.com</span>
         </div>
         <div>
-            <span>ESOMAR Corporate Member | Athenaeum Research Suite</span>
+            <span>ESOMAR Corporate Member | Atlas Research Suite</span>
         </div>
     </div>
 
     <!-- 2. Main Brand Header -->
     <header class="main-header">
-        <a href="<?php echo site_url(); ?>" class="logo-wrap">
-            <div class="logo-symbol">C</div>
-            <div class="logo-text">
-                <h2>Cognitive</h2>
-                <span>Market Research & Consulting</span>
-            </div>
+        <a href="<?php echo site_url(); ?>" class="logo-wrap" title="Cognitive Market Research & Consulting">
+            <img src="<?php echo base_url('assets/images/logo.png'); ?>" alt="Cognitive Market Research & Consulting" class="main-logo-img">
         </a>
 
         <nav class="header-nav">
@@ -60,6 +56,7 @@
         <div class="auth-modal-card">
             <div class="auth-modal-header">
                 <button class="auth-modal-close" onclick="closeAuthModal()">&times;</button>
+                <img src="<?php echo base_url('assets/images/logo.png'); ?>" alt="Cognitive Market Research" style="height: 34px; margin: 0 auto 0.75rem auto; display: block;">
                 <h3><i class="fa-solid fa-shield-halved"></i> Client Portal Access</h3>
                 <p>Authenticate as an enterprise client to access licensed reports</p>
             </div>
@@ -191,6 +188,69 @@
                     <div class="pillar-icon-box"><i class="fa-solid fa-brain"></i></div>
                     <h3>Atlas AI</h3>
                     <p>AI-powered insights platform (PaaS) with real-time intelligence and interactive dashboards.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- About Cognitive: End-to-End Market Research Solution (Iceberg Section) -->
+        <section class="landing-iceberg-section">
+            <div class="iceberg-container">
+                <!-- Left Visual: Iceberg Card with 10+ Years Badge -->
+                <div class="iceberg-visual-wrap">
+                    <div class="iceberg-card">
+                        <img src="<?php echo base_url('assets/images/iceberg.jpg'); ?>" alt="Cognitive Market Research Full Truth Iceberg Methodology" class="iceberg-img">
+                    </div>
+                    <div class="iceberg-badge">
+                        <div class="num">10+</div>
+                        <div class="txt">Years of Excellence</div>
+                    </div>
+                </div>
+
+                <!-- Right Content: Solution Details -->
+                <div class="iceberg-content">
+                    <div class="tag">About Cognitive</div>
+                    <h2>End-to-End Market Research Solution</h2>
+                    <p class="iceberg-intro">
+                        At Cognitive Market Research and Consulting, we deliver more than just data &mdash; we deliver strategic certainty. For over a decade, we have empowered global enterprises with end-to-end research solutions powered by our proprietary methodology, <strong>The Full Truth</strong>.
+                    </p>
+
+                    <div class="iceberg-services-list">
+                        <div class="iceberg-service-row">
+                            <div class="iceberg-service-icon"><i class="fa-solid fa-chart-simple"></i></div>
+                            <div><strong>Market Surveys</strong> &mdash; CATI, CAVI, CAPI, Interviews & more</div>
+                        </div>
+                        <div class="iceberg-service-row">
+                            <div class="iceberg-service-icon"><i class="fa-solid fa-users-gear"></i></div>
+                            <div><strong>Industry Experts Consultation Services</strong></div>
+                        </div>
+                        <div class="iceberg-service-row">
+                            <div class="iceberg-service-icon"><i class="fa-solid fa-chart-line"></i></div>
+                            <div><strong>Market Analysis DATA and Consultation</strong></div>
+                        </div>
+                        <div class="iceberg-service-row">
+                            <div class="iceberg-service-icon"><i class="fa-solid fa-brain"></i></div>
+                            <div><strong>Atlas AI (PaaS)</strong> &mdash; Powerful Insights Platform</div>
+                        </div>
+                    </div>
+
+                    <!-- Iceberg Callout Box -->
+                    <div class="iceberg-callout-box">
+                        <div class="iceberg-callout-title">
+                            <i class="fa-solid fa-cube"></i> ICEBERG Defines Us!
+                        </div>
+                        <p class="iceberg-callout-desc">
+                            Our proprietary research methodology delves deep beneath the surface, combining survey insights, industry analysts, and market analysts &mdash; each validated and perfected by domain experts.
+                        </p>
+                    </div>
+
+                    <div class="iceberg-actions">
+                        <button class="btn-read-more" onclick="openAuthModal()">
+                            <i class="fa-solid fa-arrow-right"></i> Read More
+                        </button>
+                        <button class="btn-more-services" onclick="openAuthModal()">
+                            More Services
+                        </button>
+                    </div>
                 </div>
             </div>
         </section>

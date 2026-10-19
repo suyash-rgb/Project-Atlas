@@ -2,7 +2,10 @@ import logging
 import time
 from uuid import uuid4
 
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 # Project Atlas API Gateway
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -104,6 +107,16 @@ def create_application() -> FastAPI:
     @app.get("/api/v1/docs", include_in_schema=False)
     async def v1_docs_redirect():
         return RedirectResponse(url="/docs")
+
+    @app.get("/portal", include_in_schema=False)
+    @app.get("/preview", include_in_schema=False)
+    async def portal_redirect():
+        return RedirectResponse(url="/portal/preview.html")
+
+    # Mount portal directory to serve the frontend portal on the exact same port
+    portal_dir = Path(__file__).resolve().parent.parent.parent / "portal"
+    if portal_dir.exists():
+        app.mount("/portal", StaticFiles(directory=str(portal_dir), html=True), name="portal")
 
     # Root health check endpoint (essential for Docker healthcheck and ALB probes)
     @app.get("/health", tags=["Health"])

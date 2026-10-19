@@ -3,12 +3,14 @@ from unittest.mock import patch
 from app.services.chat_service import ChatService
 from app.schemas.chat import ChatResponse
 from app.core.telemetry import telemetry
+from app.core.semantic_cache import semantic_cache
 
 
 class TestChatService:
     def setup_method(self):
         self.service = ChatService()
         telemetry.cache.clear()
+        semantic_cache.clear()
 
     def test_empty_client_id_raises_value_error(self):
         with pytest.raises(ValueError, match="client_id cannot be empty"):
