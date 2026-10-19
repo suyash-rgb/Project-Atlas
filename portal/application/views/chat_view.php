@@ -8,8 +8,8 @@
     <title><?php echo html_escape($title); ?></title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="icon" type="image/png" href="<?php echo base_url('assets/images/logo.png'); ?>">
-    <link rel="stylesheet" href="<?php echo base_url('assets/css/style.css'); ?>">
+    <link rel="icon" type="image/png" href="<?php echo parse_url(base_url('assets/images/logo.png'), PHP_URL_PATH); ?>">
+    <link rel="stylesheet" href="<?php echo parse_url(base_url('assets/css/style.css'), PHP_URL_PATH); ?>">
 </head>
 <body>
 
@@ -26,15 +26,15 @@
 
     <!-- 2. Main Brand Header -->
     <header class="main-header">
-        <a href="<?php echo site_url(); ?>" class="logo-wrap" title="Cognitive Market Research & Consulting">
-            <img src="<?php echo base_url('assets/images/logo.png'); ?>" alt="Cognitive Market Research & Consulting" class="main-logo-img">
+        <a href="<?php echo parse_url(site_url(), PHP_URL_PATH); ?>" class="logo-wrap" title="Cognitive Market Research & Consulting">
+            <img src="<?php echo parse_url(base_url('assets/images/logo.png'), PHP_URL_PATH); ?>" alt="Cognitive Market Research & Consulting" class="main-logo-img">
         </a>
 
         <nav class="header-nav">
             <a href="javascript:void(0)" class="nav-link active" id="navHome" onclick="navigateTo('home')">Home</a>
-            <a href="javascript:void(0)" class="nav-link" id="navReports" onclick="navigateTo('home')">Market Reports</a>
+            <a href="javascript:void(0)" class="nav-link" id="navReports" onclick="navigateTo('copilot')">Market Reports</a>
             <a href="javascript:void(0)" class="nav-link" id="navCopilot" onclick="navigateTo('copilot')">Report Copilot (AI)</a>
-            <a href="javascript:void(0)" class="nav-link" id="navAthenaeum" onclick="navigateTo('home')">Atlas Access</a>
+            <a href="javascript:void(0)" class="nav-link" id="navAthenaeum" onclick="navigateTo('copilot')">Atlas Access</a>
 
             <!-- Corporate Client Account Profile & Switch Session -->
             <div id="authProfileContainer" class="user-profile-nav" style="display: none;">
@@ -56,59 +56,54 @@
         <div class="auth-modal-card">
             <div class="auth-modal-header">
                 <button class="auth-modal-close" onclick="closeAuthModal()">&times;</button>
-                <img src="<?php echo base_url('assets/images/logo.png'); ?>" alt="Cognitive Market Research" style="height: 34px; margin: 0 auto 0.75rem auto; display: block;">
+                <img src="<?php echo parse_url(base_url('assets/images/logo.png'), PHP_URL_PATH); ?>" alt="Cognitive Market Research" style="height: 34px; margin: 0 auto 0.75rem auto; display: block;">
                 <h3><i class="fa-solid fa-shield-halved"></i> Client Portal Access</h3>
-                <p>Authenticate as an enterprise client to access licensed reports</p>
+                <p>Use your business email and password to access your report workspace</p>
             </div>
             <div class="auth-tabs">
-                <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Log In</button>
-                <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Register</button>
+                <button type="button" class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Log In</button>
+                <button type="button" class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Create Account</button>
             </div>
             <div class="auth-modal-body">
-                <!-- Login View -->
-                <div id="loginFormView">
+                <p class="auth-message" id="authMessage" role="status" aria-live="polite"></p>
+                <form id="loginForm">
                     <div class="auth-form-group">
-                        <label for="loginClientSelect">Select Corporate Client Account:</label>
-                        <select id="loginClientSelect">
-                            <?php foreach ($clients as $cid => $cname): ?>
-                                <option value="<?php echo html_escape($cid); ?>"><?php echo html_escape("[$cid] $cname"); ?></option>
-                            <?php endforeach; ?>
-                        </select>
+                        <label for="loginContactEmail">Business Email:</label>
+                        <input type="email" id="loginContactEmail" autocomplete="username" maxlength="254" required>
                     </div>
                     <div class="auth-form-group">
-                        <label for="loginContactEmail">Authorized Corporate Email:</label>
-                        <input type="email" id="loginContactEmail" value="ops@example.com" placeholder="e.g. ops@northwind.example.com">
+                        <label for="loginPassword">Password:</label>
+                        <input type="password" id="loginPassword" autocomplete="current-password" required>
                     </div>
-                    <button class="btn-auth-submit" onclick="submitClientLogin()">
+                    <button class="btn-auth-submit" type="submit">
                         <i class="fa-solid fa-lock-open"></i> Log In to Report Copilot
                     </button>
-                </div>
+                </form>
 
-                <!-- Signup View -->
-                <div id="signupFormView" style="display: none;">
-                    <div class="auth-form-group">
-                        <label for="signupClientId">Assigned Client Identifier:</label>
-                        <input type="text" id="signupClientId" placeholder="e.g. C-07">
-                    </div>
+                <form id="signupForm" style="display: none;">
                     <div class="auth-form-group">
                         <label for="signupCompanyName">Company Name:</label>
-                        <input type="text" id="signupCompanyName" placeholder="e.g. Apex Power & Water Corp">
+                        <input type="text" id="signupCompanyName" autocomplete="organization" maxlength="255" required>
                     </div>
                     <div class="auth-form-group">
-                        <label for="signupEmail">Corporate Contact Email:</label>
-                        <input type="email" id="signupEmail" placeholder="e.g. research@apexpower.example.com">
+                        <label for="signupEmail">Business Email:</label>
+                        <input type="email" id="signupEmail" autocomplete="email" maxlength="254" required>
                     </div>
                     <div class="auth-form-group">
-                        <label for="signupPurchasedReports">Initial Purchased Reports:</label>
-                        <input type="text" id="signupPurchasedReports" placeholder="e.g. R-101, R-103">
+                        <label for="signupPassword">Password (12–72 characters):</label>
+                        <input type="password" id="signupPassword" autocomplete="new-password" minlength="12" maxlength="72" required>
                     </div>
-                    <button class="btn-auth-submit" onclick="submitClientSignup()">
+                    <div class="auth-form-group">
+                        <label for="signupPasswordConfirmation">Confirm Password:</label>
+                        <input type="password" id="signupPasswordConfirmation" autocomplete="new-password" minlength="12" maxlength="72" required>
+                    </div>
+                    <button class="btn-auth-submit" type="submit">
                         <i class="fa-solid fa-user-plus"></i> Create Client Account
                     </button>
-                </div>
+                </form>
 
                 <div class="auth-hint">
-                    <i class="fa-solid fa-circle-info"></i> Client session is authenticated securely and grants access strictly to your corporate licensed reports.
+                    <i class="fa-solid fa-circle-info"></i> Your business email is used as your login name and is not email-verified. New accounts can access public report excerpts; paid reports require an existing entitlement.
                 </div>
             </div>
         </div>
@@ -152,7 +147,7 @@
                     </div>
                     <div class="landing-search-bar">
                         <input type="text" id="landingSearchInput" placeholder="e.g. Coal market, EV battery...">
-                        <button onclick="openAuthModal()"><i class="fa-solid fa-magnifying-glass"></i></button>
+                        <button type="button" onclick="searchReportsFromLanding()" aria-label="Search available reports"><i class="fa-solid fa-magnifying-glass"></i></button>
                     </div>
                     <div class="landing-search-tags">
                         <button class="landing-tag-btn" onclick="openAuthModal()"><i class="fa-solid fa-chart-simple"></i> Market Surveys</button>
@@ -198,7 +193,7 @@
                 <!-- Left Visual: Iceberg Card with 10+ Years Badge -->
                 <div class="iceberg-visual-wrap">
                     <div class="iceberg-card">
-                        <img src="<?php echo base_url('assets/images/iceberg.jpg'); ?>" alt="Cognitive Market Research Full Truth Iceberg Methodology" class="iceberg-img">
+                        <img src="<?php echo parse_url(base_url('assets/images/iceberg.jpg'), PHP_URL_PATH); ?>" alt="Cognitive Market Research Full Truth Iceberg Methodology" class="iceberg-img">
                     </div>
                     <div class="iceberg-badge">
                         <div class="num">10+</div>
@@ -284,7 +279,7 @@
             <!-- Left Sidebar: Client Library & Entitlements -->
         <aside class="library-sidebar">
             <div class="sidebar-section-title">
-                <i class="fa-solid fa-folder-open"></i> Purchased Reports
+                <i class="fa-solid fa-folder-open"></i> Available Reports
             </div>
             
             <div id="entitlementList" style="display: flex; flex-direction: column; gap: 0.65rem;">
@@ -309,17 +304,16 @@
             <div class="chat-stream" id="chatStream">
                 <div class="assistant-bubble">
                     <div class="meta-badges-row">
-                        <span class="badge-pill conf">SYSTEM INITIALIZED</span>
-                        <span class="badge-pill router">ENTITLEMENTS VERIFIED</span>
+                        <span class="badge-pill conf">SYSTEM READY</span>
+                        <span class="badge-pill router">ACCOUNT REPORTS</span>
                     </div>
                     <div class="answer-content">
-                        Hello! Welcome to the <strong>Cognitive Market Research Report Copilot</strong>. 
-                        I have verified your active company license. Ask any factual lookup, growth rate derivation (CAGR), or cross-report comparison.
+                        Welcome to the <strong>Cognitive Market Research Report Copilot</strong>. Your workspace shows the reports available to your account. Ask factual questions, request growth-rate calculations, or compare accessible report excerpts.
                         <br><br>
                         <em>Sample queries to try (click to run):</em>
                         <ul style="margin-left: 1.25rem; margin-top: 0.5rem; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.4rem;">
-                            <li onclick="triggerQuickQuery('What will the smart water meter market be worth in 2030 in R-101?')" style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;"><i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "What will the smart water meter market be worth in 2030 in R-101?"</li>
-                            <li onclick="triggerQuickQuery('Why does R-101 report $4.21B while R-102 reports $3.87B for 2024?')" style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;"><i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Why does R-101 report $4.21B while R-102 reports $3.87B for 2024?"</li>
+                            <li onclick="triggerQuickQuery('What does the R-102 public excerpt say about the smart water meter market?')" style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;"><i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "What does the R-102 public excerpt say about the smart water meter market?"</li>
+                            <li onclick="triggerQuickQuery('Compare the public market size estimates in R-102 and R-105.')" style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;"><i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Compare the public market size estimates in R-102 and R-105."</li>
                             <li onclick="triggerQuickQuery('Which sector has the most published reports in your database?')" style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;"><i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Which sector has the most published reports in your database?"</li>
                         </ul>
                     </div>
@@ -355,14 +349,16 @@
     </footer>
 
     <!-- Interactive Logic -->
-    <script src="<?php echo base_url('assets/js/markdown.js'); ?>"></script>
+    <script src="<?php echo parse_url(base_url('assets/js/markdown.js'), PHP_URL_PATH); ?>"></script>
     <script>
         const chatStream = document.getElementById('chatStream');
         const chatInput = document.getElementById('chatInput');
         const sendBtn = document.getElementById('sendBtn');
         const entitlementList = document.getElementById('entitlementList');
         const authModal = document.getElementById('authModal');
-        const loginClientSelect = document.getElementById('loginClientSelect');
+        const authMessage = document.getElementById('authMessage');
+        const loginForm = document.getElementById('loginForm');
+        const signupForm = document.getElementById('signupForm');
         const currentCompanyName = document.getElementById('currentCompanyName');
         const currentClientIdBadge = document.getElementById('currentClientIdBadge');
         const authProfileContainer = document.getElementById('authProfileContainer');
@@ -371,9 +367,24 @@
         const viewCopilot = document.getElementById('viewCopilot');
         const navHome = document.getElementById('navHome');
         const navCopilot = document.getElementById('navCopilot');
+        const csrfTokenName = document.querySelector('meta[name="csrf-token-name"]')?.getAttribute('content') || 'csrf_test_name';
+        const csrfHash = document.querySelector('meta[name="csrf-hash"]')?.getAttribute('content') || '';
+        const authUrls = {
+            login: <?php echo json_encode(parse_url(site_url('auth/login'), PHP_URL_PATH), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            register: <?php echo json_encode(parse_url(site_url('auth/register'), PHP_URL_PATH), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            logout: <?php echo json_encode(parse_url(site_url('auth/logout'), PHP_URL_PATH), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            reports: <?php echo json_encode(parse_url(site_url('chat/reports'), PHP_URL_PATH), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            stream: <?php echo json_encode(parse_url(site_url('chat/stream'), PHP_URL_PATH), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            recordConversation: <?php echo json_encode(parse_url(site_url('chat/record_conversation'), PHP_URL_PATH), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>,
+            feedback: <?php echo json_encode(parse_url(site_url('chat/feedback'), PHP_URL_PATH), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT); ?>
+        };
+        const initialClient = <?php echo json_encode(
+            $client,
+            JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_QUOT
+        ); ?>;
 
-        // Corporate Client Session State (Null by default on Landing Page)
-        let activeClient = null;
+        let activeClient = initialClient && typeof initialClient === 'object' ? initialClient : null;
+        let pendingQuery = null;
 
         // View Navigation
         function navigateTo(targetView) {
@@ -396,179 +407,231 @@
 
         // Modal Controls
         function openAuthModal() {
+            setAuthMessage('');
             authModal.style.display = 'flex';
         }
 
         function closeAuthModal() {
             authModal.style.display = 'none';
+            pendingQuery = null;
         }
 
         function switchAuthTab(tab) {
             const tabLogin = document.getElementById('tabLogin');
             const tabSignup = document.getElementById('tabSignup');
-            const loginView = document.getElementById('loginFormView');
-            const signupView = document.getElementById('signupFormView');
+            setAuthMessage('');
 
             if (tab === 'login') {
                 tabLogin.classList.add('active');
                 tabSignup.classList.remove('active');
-                loginView.style.display = 'block';
-                signupView.style.display = 'none';
+                loginForm.style.display = 'block';
+                signupForm.style.display = 'none';
             } else {
                 tabSignup.classList.add('active');
                 tabLogin.classList.remove('active');
-                loginView.style.display = 'none';
-                signupView.style.display = 'block';
+                loginForm.style.display = 'none';
+                signupForm.style.display = 'block';
             }
         }
 
-        function submitClientLogin() {
-            const cid = loginClientSelect.value;
-            const email = document.getElementById('loginContactEmail').value.trim();
-            const selectedText = loginClientSelect.options[loginClientSelect.selectedIndex].text;
-            
-            const compMatch = selectedText.match(/\[C-\d+\]\s*(.*?)(?:\s*\(|$)/);
-            const compName = compMatch ? compMatch[1].trim() : selectedText;
+        async function submitClientLogin(event) {
+            event.preventDefault();
+            setAuthMessage('');
+            const submitButton = loginForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
 
-            activeClient = {
-                id: cid,
-                company: compName,
-                email: email || `${cid.toLowerCase()}@client.example.com`
-            };
-
-            currentCompanyName.textContent = activeClient.company;
-            currentClientIdBadge.textContent = activeClient.id;
-            authProfileContainer.style.display = 'flex';
-            btnHeaderLogin.style.display = 'none';
-
-            closeAuthModal();
-            updateSidebarEntitlements();
-
-            chatStream.innerHTML = '';
-            appendAssistantResponse({
-                answer: `Welcome back, **${activeClient.company}** (${activeClient.id}). Your secure enterprise session is active. You have full analytical clearance to query your licensed research reports. How can I assist your team today?`,
-                confidence: 1.0
-            });
-
-            navigateTo('copilot');
+            try {
+                const result = await postAuth(authUrls.login, {
+                    email: document.getElementById('loginContactEmail').value,
+                    password: document.getElementById('loginPassword').value
+                });
+                activateClient(result.client, `Welcome back, **${result.client.company}**.`);
+                loginForm.reset();
+                closeAuthModal();
+            } catch (error) {
+                setAuthMessage(error.message, true);
+            } finally {
+                submitButton.disabled = false;
+            }
         }
 
-        function signOutClient() {
+        async function signOutClient() {
+            try {
+                await postAuth(authUrls.logout, {});
+            } catch (error) {
+                setAuthMessage(error.message, true);
+                authModal.style.display = 'flex';
+                return;
+            }
+
             activeClient = null;
             authProfileContainer.style.display = 'none';
             btnHeaderLogin.style.display = 'flex';
+            updateSidebarEntitlements();
+            chatStream.innerHTML = '';
+            chatInput.value = '';
             navigateTo('home');
         }
 
-        function submitClientSignup() {
-            const cid = document.getElementById('signupClientId').value.trim().toUpperCase() || 'C-07';
-            const company = document.getElementById('signupCompanyName').value.trim() || 'New Enterprise Client';
-            const email = document.getElementById('signupEmail').value.trim() || 'client@example.com';
-            
-            activeClient = { id: cid, company: company, email: email };
+        async function submitClientSignup(event) {
+            event.preventDefault();
+            setAuthMessage('');
+            const submitButton = signupForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+
+            try {
+                const result = await postAuth(authUrls.register, {
+                    company: document.getElementById('signupCompanyName').value,
+                    email: document.getElementById('signupEmail').value,
+                    password: document.getElementById('signupPassword').value,
+                    password_confirmation: document.getElementById('signupPasswordConfirmation').value
+                });
+                activateClient(
+                    result.client,
+                    `Welcome to Project Atlas, **${result.client.company}**. Your account is ready; public report excerpts are available in your library.`
+                );
+                signupForm.reset();
+                closeAuthModal();
+            } catch (error) {
+                setAuthMessage(error.message, true);
+            } finally {
+                submitButton.disabled = false;
+            }
+        }
+
+        function activateClient(client, welcomeMessage) {
+            activeClient = client;
             currentCompanyName.textContent = activeClient.company;
             currentClientIdBadge.textContent = activeClient.id;
             authProfileContainer.style.display = 'flex';
             btnHeaderLogin.style.display = 'none';
-
-            closeAuthModal();
             updateSidebarEntitlements();
-
             chatStream.innerHTML = '';
-            appendAssistantResponse({
-                answer: `Welcome to Project Atlas, **${activeClient.company}** (${activeClient.id}). Your client account registration is confirmed.`,
-                confidence: 1.0
-            });
-
+            if (welcomeMessage) {
+                appendAssistantResponse({ answer: welcomeMessage, confidence: 1.0 });
+            }
+            chatInput.value = '';
             navigateTo('copilot');
+            if (pendingQuery) {
+                const query = pendingQuery;
+                pendingQuery = null;
+                window.setTimeout(() => triggerQuickQuery(query), 0);
+            }
+        }
+
+        function setAuthMessage(message, isError) {
+            authMessage.textContent = message;
+            authMessage.classList.toggle('is-error', Boolean(isError));
+        }
+
+        async function postAuth(url, payload) {
+            const headers = {
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'X-Requested-With': 'XMLHttpRequest'
+            };
+
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: headers,
+                body: formRequestBody(payload)
+            });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(result.message || `Request failed (${response.status}).`);
+            }
+            return result;
+        }
+
+        function formRequestBody(payload) {
+            const form = new URLSearchParams();
+            Object.keys(payload).forEach(key => {
+                form.append(key, payload[key]);
+            });
+            form.append(csrfTokenName, csrfHash);
+            return form.toString();
         }
 
         async function updateSidebarEntitlements() {
             if (!activeClient) {
                 entitlementList.innerHTML = '';
+                entitlementList.style.color = '';
                 return;
             }
-            const cid = activeClient.id;
+            const clientId = activeClient.id;
             entitlementList.innerHTML = '<div style="font-size: 0.78rem; color: #64748b; padding: 0.5rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading entitled reports...</div>';
 
             try {
-                const res = await fetch(`http://127.0.0.1:8085/api/v1/clients/${cid}/reports`);
-                if (res.ok) {
-                    const data = await res.json();
-                    renderReportCards(data.reports || []);
+                const response = await fetch(authUrls.reports, {
+                    headers: { 'Accept': 'application/json' }
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(data.message || `Report lookup failed (${response.status}).`);
+                }
+                if (!activeClient || activeClient.id !== clientId) {
                     return;
                 }
+                renderReportCards(data.reports || []);
             } catch (err) {
-                console.warn('API lookup failed, falling back to local client mapping:', err);
+                if (!activeClient || activeClient.id !== clientId) {
+                    return;
+                }
+                entitlementList.textContent = 'Could not load this account’s reports. Please refresh or sign in again.';
+                entitlementList.style.color = '#b91c1c';
+            }
+        }
+
+        function searchReportsFromLanding() {
+            const searchInput = document.getElementById('landingSearchInput');
+            const searchTerm = searchInput.value.trim();
+            if (!searchTerm) {
+                searchInput.focus();
+                return;
             }
 
-            // Fallback matching database seed
-            const fallbackMap = {
-                'C-01': [
-                    { id: 'R-101', title: 'Global Smart Water Meter Market 2025', sector: 'Utilities', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
-                    { id: 'R-103', title: 'Residential Water Purifier Market 2025', sector: 'Consumer Durables', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
-                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false },
-                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
-                ],
-                'C-02': [
-                    { id: 'R-103', title: 'Residential Water Purifier Market 2025', sector: 'Consumer Durables', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
-                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false },
-                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
-                ],
-                'C-03': [
-                    { id: 'R-104', title: 'Commercial & Industrial RO Membrane Systems 2025', sector: 'Industrial Equipment', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
-                    { id: 'R-106', title: 'Decentralized Wastewater Recycling Systems 2025', sector: 'Cleantech', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
-                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false },
-                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
-                ],
-                'C-04': [
-                    { id: 'R-101', title: 'Global Smart Water Meter Market 2025', sector: 'Utilities', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
-                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false },
-                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
-                ],
-                'C-05': [
-                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
-                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
-                ],
-                'C-06': [
-                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false },
-                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
-                ]
-            };
-            renderReportCards(fallbackMap[cid] || []);
+            const query = `Search my available reports for ${searchTerm}.`;
+            if (!activeClient) {
+                pendingQuery = query;
+                openAuthModal();
+                return;
+            }
+            navigateTo('copilot');
+            triggerQuickQuery(query);
         }
 
         function renderReportCards(reports) {
             entitlementList.innerHTML = '';
             if (!reports || reports.length === 0) {
-                entitlementList.innerHTML = '<div style="font-size: 0.78rem; color: #94a3b8; font-style: italic;">No licensed reports found for this account.</div>';
+                entitlementList.innerHTML = '<div style="font-size: 0.78rem; color: #94a3b8; font-style: italic;">No reports are available for this account.</div>';
                 return;
             }
 
+            entitlementList.style.color = '';
             reports.forEach(r => {
                 const card = document.createElement('div');
                 card.className = 'entitled-report-card';
                 const isPurchased = r.is_purchased !== false && (r.entitlement_type || '').includes('Purchased');
                 const badgeColor = isPurchased ? '#0284c7' : '#0d9488';
                 const lockIcon = isPurchased ? '<i class="fa-solid fa-lock-open"></i> Licensed' : '<i class="fa-solid fa-file-lines"></i> Public Excerpt';
+                const reportId = escapeHtml(r.id || '');
+                const title = escapeHtml(r.title || 'Untitled report');
+                const sector = escapeHtml(r.sector || 'Market Report');
+                const entitlement = escapeHtml(r.entitlement_type || 'Licensed');
 
                 card.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <span class="report-badge-id">${r.id}</span>
-                        <span style="font-size: 0.7rem; color: ${badgeColor}; font-weight: 600;">${r.entitlement_type || 'Licensed'}</span>
+                        <span class="report-badge-id">${reportId}</span>
+                        <span style="font-size: 0.7rem; color: ${badgeColor}; font-weight: 600;">${entitlement}</span>
                     </div>
-                    <div class="title">${r.title}</div>
+                    <div class="title">${title}</div>
                     <div class="meta">
-                        <span>${r.sector || 'Market Report'}</span>
+                        <span>${sector}</span>
                         <span style="color: #059669; font-weight: 600;">${lockIcon}</span>
                     </div>
                 `;
                 entitlementList.appendChild(card);
             });
         }
-
-        // Initialize sidebar on page load
-        updateSidebarEntitlements();
 
         // Security: HTML entity encoding against XSS attacks
         function escapeHtml(str) {
@@ -581,10 +644,11 @@
                 .replace(/'/g, '&#039;');
         }
 
-        const csrfTokenName = document.querySelector('meta[name="csrf-token-name"]')?.getAttribute('content') || 'csrf_test_name';
-        const csrfHash = document.querySelector('meta[name="csrf-hash"]')?.getAttribute('content') || '';
-
         function triggerQuickQuery(text) {
+            if (!activeClient) {
+                openAuthModal();
+                return;
+            }
             chatInput.value = text;
             sendMessage();
         }
@@ -597,9 +661,12 @@
             chatStream.scrollTop = chatStream.scrollHeight;
         }
 
-        function appendAssistantResponse(data) {
+        function appendAssistantResponse(data, question) {
             const bubble = document.createElement('div');
             bubble.className = 'chat-bubble assistant-bubble';
+            if (typeof question === 'string') {
+                bubble.dataset.query = question;
+            }
 
             let html = '<div class="meta-badges-row">';
             if (data.confidence !== undefined) {
@@ -661,21 +728,21 @@
                 html += '</div>';
             }
 
-            // Generate message identifier for feedback linking
-            const messageId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
-
-            // Feedback buttons with messageId
-            html += `
-                <div class="feedback-bar" data-msg-id="${messageId}">
-                    <span>Was this response helpful and accurate?</span>
-                    <button class="feedback-btn" onclick="submitFeedback(1, this, '${messageId}')"><i class="fa-regular fa-thumbs-up"></i> Helpful</button>
-                    <button class="feedback-btn" onclick="submitFeedback(0, this, '${messageId}')"><i class="fa-regular fa-thumbs-down"></i> Inaccurate</button>
-                </div>
-            `;
+            if (typeof question === 'string' && question.trim()) {
+                const messageId = 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+                html += `
+                    <div class="feedback-bar" data-msg-id="${messageId}">
+                        <span>Was this response helpful and accurate?</span>
+                        <button class="feedback-btn" onclick="submitFeedback(1, this, '${messageId}')"><i class="fa-regular fa-thumbs-up"></i> Helpful</button>
+                        <button class="feedback-btn" onclick="submitFeedback(0, this, '${messageId}')"><i class="fa-regular fa-thumbs-down"></i> Inaccurate</button>
+                    </div>
+                `;
+            }
 
             bubble.innerHTML = html;
             chatStream.appendChild(bubble);
             chatStream.scrollTop = chatStream.scrollHeight;
+            return bubble;
         }
 
         function createStreamingBubble() {
@@ -757,38 +824,32 @@
         }
 
         async function sendMessage() {
+            if (!activeClient) {
+                openAuthModal();
+                return;
+            }
             const query = chatInput.value.trim();
             if (!query) return;
 
             appendUserMessage(query);
-            chatInput.dataset.lastQuery = query;
             chatInput.value = '';
             sendBtn.disabled = true;
 
-            const clientId = activeClient.id;
             const streaming = createStreamingBubble();
             let completeResponse = null;
             let receivedToken = false;
 
             try {
-                const streamUrl = '<?php echo site_url("chat/stream"); ?>'.replace(/^https?:\/\/[^\/]+/, window.location.origin);
                 const reqHeaders = {
-                    'Content-Type': 'application/json',
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
                     'Accept': 'text/event-stream',
                     'X-Requested-With': 'XMLHttpRequest'
                 };
-                if (csrfHash) {
-                    reqHeaders['X-CSRF-Token'] = csrfHash;
-                }
 
-                const res = await fetch(streamUrl, {
+                const res = await fetch(authUrls.stream, {
                     method: 'POST',
                     headers: reqHeaders,
-                    body: JSON.stringify({
-                        client_id: clientId,
-                        query: query,
-                        [csrfTokenName]: csrfHash
-                    })
+                    body: formRequestBody({ query: query })
                 });
 
                 if (!res.ok) {
@@ -811,34 +872,42 @@
                     }
                 });
 
+                if (!completeResponse) {
+                    throw new Error('The response ended without a final answer.');
+                }
                 streaming.bubble.remove();
-                appendAssistantResponse(completeResponse);
+                const responseBubble = appendAssistantResponse(completeResponse, query);
 
-                // Persist completed conversation in MySQL history
-                if (completeResponse) {
-                    const recordUrl = '<?php echo site_url("chat/record_conversation"); ?>'.replace(/^https?:\/\/[^\/]+/, window.location.origin);
-                    fetch(recordUrl, {
+                try {
+                    const recordResponse = await fetch(authUrls.recordConversation, {
                         method: 'POST',
                         headers: {
-                            'Content-Type': 'application/json',
-                            'X-CSRF-Token': csrfHash
+                            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                            'X-Requested-With': 'XMLHttpRequest'
                         },
-                        body: JSON.stringify({
-                            client_id: clientId,
+                        body: formRequestBody({
                             question: query,
                             answer: completeResponse.answer || '',
                             confidence: completeResponse.confidence || 1.0,
-                            escalated: completeResponse.escalated ? 1 : 0,
-                            [csrfTokenName]: csrfHash
+                            escalated: completeResponse.escalated ? 1 : 0
                         })
-                    }).catch(() => {});
+                    });
+                    if (!recordResponse.ok) {
+                        const error = await recordResponse.json().catch(() => ({}));
+                        throw new Error(error.message || 'The conversation could not be saved.');
+                    }
+                } catch (error) {
+                    const notice = document.createElement('div');
+                    notice.className = 'stream-error';
+                    notice.textContent = error.message;
+                    responseBubble.appendChild(notice);
                 }
             } catch (err) {
                 const message = err.message || 'Connection error communicating with Report Copilot.';
                 if (receivedToken) {
                     const notice = document.createElement('div');
                     notice.className = 'stream-error';
-                    notice.textContent = `Response interrupted: ${escapeHtml(message)}`;
+                    notice.textContent = `Response interrupted: ${message}`;
                     streaming.bubble.appendChild(notice);
                 } else {
                     streaming.bubble.remove();
@@ -854,41 +923,71 @@
         }
 
         async function submitFeedback(rating, btn, messageId) {
-            const bar = btn.parentElement;
-            const currentQuery = chatInput.dataset.lastQuery || '';
-            bar.innerHTML = '<span style="color: var(--cmr-success); font-weight: 600;"><i class="fa-solid fa-check"></i> Thank you! Your feedback has been recorded in our MySQL database.</span>';
+            const bar = btn.closest('.feedback-bar');
+            const bubble = bar.closest('.chat-bubble');
+            const currentQuery = bubble.dataset.query || '';
+            const buttons = bar.querySelectorAll('.feedback-btn');
+            let status = bar.querySelector('.feedback-status');
+            if (!status) {
+                status = document.createElement('span');
+                status.className = 'feedback-status';
+                bar.appendChild(status);
+            }
+            buttons.forEach(button => {
+                button.disabled = true;
+            });
+            status.textContent = 'Saving feedback...';
+
             try {
-                const feedbackUrl = '<?php echo site_url("chat/feedback"); ?>'.replace(/^https?:\/\/[^\/]+/, window.location.origin);
-                const reqHeaders = { 'Content-Type': 'application/json' };
-                if (csrfHash) {
-                    reqHeaders['X-CSRF-Token'] = csrfHash;
-                }
-                await fetch(feedbackUrl, {
+                const response = await fetch(authUrls.feedback, {
                     method: 'POST',
-                    headers: reqHeaders,
-                    body: JSON.stringify({
-                        client_id: activeClient.id,
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    },
+                    body: formRequestBody({
                         message_id: messageId || ('msg-' + Date.now()),
                         rating: rating === 1 ? 'up' : 'down',
                         comment: rating === 1 ? 'Helpful and accurate response.' : 'Flagged as inaccurate or incomplete.',
-                        query: currentQuery,
-                        [csrfTokenName]: csrfHash
+                        query: currentQuery
                     })
                 });
-            } catch (e) {}
-        }
-
-        function triggerQuickQuery(text) {
-            chatInput.value = text;
-            sendMessage();
+                const result = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    throw new Error(result.message || 'Feedback could not be saved.');
+                }
+                bar.innerHTML = '<span class="feedback-success"><i class="fa-solid fa-check"></i> Thank you! Your feedback was saved.</span>';
+            } catch (error) {
+                status.classList.add('is-error');
+                status.textContent = error.message;
+                buttons.forEach(button => {
+                    button.disabled = false;
+                });
+            }
         }
         window.triggerQuickQuery = triggerQuickQuery;
 
+        loginForm.addEventListener('submit', submitClientLogin);
+        signupForm.addEventListener('submit', submitClientSignup);
+        if (activeClient) {
+            currentCompanyName.textContent = activeClient.company;
+            currentClientIdBadge.textContent = activeClient.id;
+            authProfileContainer.style.display = 'flex';
+            btnHeaderLogin.style.display = 'none';
+            updateSidebarEntitlements();
+            navigateTo('copilot');
+        }
         sendBtn.addEventListener('click', sendMessage);
         chatInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 sendMessage();
+            }
+        });
+        document.getElementById('landingSearchInput').addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                searchReportsFromLanding();
             }
         });
     </script>

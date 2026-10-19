@@ -17,7 +17,7 @@ class Atlas_client {
     public function __construct() {
         $this->CI =& get_instance();
 
-        $this->api_base_url = getenv('FASTAPI_URL') ?: 'http://127.0.0.1:8085';
+        $this->api_base_url = getenv('FASTAPI_URL') ?: 'http://127.0.0.1:8000';
         $this->api_key = getenv('ATLAS_API_KEY') ?: 'atlas_dev_secret_key';
         $url_parts = parse_url($this->api_base_url);
         if (
@@ -53,6 +53,13 @@ class Atlas_client {
             'query'     => $query
         );
         return $this->_send_request('/api/v1/chat', 'POST', $payload);
+    }
+
+    public function get_client_reports($client_id) {
+        return $this->_send_request(
+            '/api/v1/clients/' . rawurlencode($client_id) . '/reports',
+            'GET'
+        );
     }
 
     /**
