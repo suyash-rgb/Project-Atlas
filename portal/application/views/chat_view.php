@@ -35,20 +35,23 @@
         </a>
 
         <nav class="header-nav">
-            <a href="#" class="nav-link">Market Reports</a>
-            <a href="#" class="nav-link">Custom Consulting</a>
-            <a href="#" class="nav-link active">Report Copilot (AI)</a>
-            <a href="#" class="nav-link">Athenaeum Access</a>
+            <a href="javascript:void(0)" class="nav-link active" id="navHome" onclick="navigateTo('home')">Home</a>
+            <a href="javascript:void(0)" class="nav-link" id="navReports" onclick="navigateTo('home')">Market Reports</a>
+            <a href="javascript:void(0)" class="nav-link" id="navCopilot" onclick="navigateTo('copilot')">Report Copilot (AI)</a>
+            <a href="javascript:void(0)" class="nav-link" id="navAthenaeum" onclick="navigateTo('home')">Athenaeum Access</a>
 
             <!-- Corporate Client Account Profile & Switch Session -->
-            <div id="authProfileContainer" class="user-profile-nav">
+            <div id="authProfileContainer" class="user-profile-nav" style="display: none;">
                 <i class="fa-solid fa-building" style="color: var(--cmr-primary-blue);"></i>
-                <span class="company-name" id="currentCompanyName">Northwind Utilities</span>
-                <span class="client-tag" id="currentClientIdBadge">C-01</span>
-                <button class="btn-auth-action" onclick="openAuthModal()" title="Switch Client Account / Log In">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Switch
+                <span class="company-name" id="currentCompanyName">Not Signed In</span>
+                <span class="client-tag" id="currentClientIdBadge">Guest</span>
+                <button class="btn-auth-action" onclick="signOutClient()" title="Sign Out of Client Account">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
                 </button>
             </div>
+            <button id="btnHeaderLogin" class="btn-login-trigger" onclick="openAuthModal()">
+                <i class="fa-solid fa-user-lock"></i> Client Sign In
+            </button>
         </nav>
     </header>
 
@@ -61,8 +64,8 @@
                 <p>Authenticate as an enterprise client to access licensed reports</p>
             </div>
             <div class="auth-tabs">
-                <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Client Sign In</button>
-                <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Register Client</button>
+                <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Log In</button>
+                <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Register</button>
             </div>
             <div class="auth-modal-body">
                 <!-- Login View -->
@@ -114,30 +117,102 @@
         </div>
     </div>
 
-    <!-- 3. Portal Sub-Banner -->
-    <div class="portal-sub-banner">
-        <div>
-            <h3>
-                <i class="fa-solid fa-compass" style="color: #00a8cc;"></i>
-                Project Atlas — Report Copilot
-                <span class="badge-live-copilot">Active Agent</span>
-            </h3>
-            <p>Non-autoregressive Laya decision router with entitlement-filtered RAG & citation verification.</p>
-        </div>
-        <div class="portal-actions">
-            <a href="javascript:void(0)" class="btn-view-library" onclick="triggerQuickQuery('What reports are in your library?')">
-                <i class="fa-solid fa-database"></i> Database Summary
-            </a>
-            <a href="javascript:void(0)" class="btn-view-library" onclick="triggerQuickQuery('Why do R-101 and R-102 disagree on 2024?')">
-                <i class="fa-solid fa-code-compare"></i> Compare R-101 vs R-102
-            </a>
-        </div>
+    <!-- VIEW 1: Enterprise Landing Page (Default Home Page) -->
+    <div id="viewLanding" class="landing-view-container">
+        <!-- Hero Section -->
+        <section class="landing-hero">
+            <div class="landing-hero-tag">
+                <i class="fa-solid fa-compass"></i> Next-Gen Market Intelligence Platform
+            </div>
+            <h1>Cognitive Market Research<br><span>Report Copilot (Atlas)</span></h1>
+            <p>
+                Access verified strategic research, deterministic growth projections, and cross-report discrepancy reconciliation. Empower your executive team with private, entitled AI consulting.
+            </p>
+            <div class="landing-hero-actions">
+                <button class="btn-hero-primary" onclick="openAuthModal()">
+                    <i class="fa-solid fa-lock-open"></i> Client Sign In
+                </button>
+                <button class="btn-hero-secondary" onclick="switchAuthTab('signup'); openAuthModal();">
+                    <i class="fa-solid fa-user-plus"></i> Register Corporate Account
+                </button>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="landing-stats-grid">
+                <div class="landing-stat-item">
+                    <div class="landing-stat-value">6+</div>
+                    <div class="landing-stat-label">Enterprise Sectors</div>
+                </div>
+                <div class="landing-stat-item">
+                    <div class="landing-stat-value">&lt;35ms</div>
+                    <div class="landing-stat-label">Guardrail Verification</div>
+                </div>
+                <div class="landing-stat-item">
+                    <div class="landing-stat-value">100%</div>
+                    <div class="landing-stat-label">Formula Provenance</div>
+                </div>
+                <div class="landing-stat-item">
+                    <div class="landing-stat-value">Zero</div>
+                    <div class="landing-stat-label">Unauthorized Data Leakage</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Showcase -->
+        <section class="landing-features">
+            <div class="landing-features-header">
+                <h2>Precision Market Intelligence at Scale</h2>
+                <p>Built specifically for institutional investors, utilities, and industrial equipment manufacturers</p>
+            </div>
+            <div class="landing-cards-grid">
+                <div class="landing-card">
+                    <div class="landing-card-icon"><i class="fa-solid fa-code-compare"></i></div>
+                    <h3>Conflict & Discrepancy Reconciliation</h3>
+                    <p>Detect methodology differences across publishers (e.g. Turnkey vs Hardware-only scope) with full context transparency instead of arbitrary averaging.</p>
+                    <span class="landing-card-link" onclick="openAuthModal()">Explore Copilot <i class="fa-solid fa-arrow-right"></i></span>
+                </div>
+                <div class="landing-card">
+                    <div class="landing-card-icon"><i class="fa-solid fa-calculator"></i></div>
+                    <h3>Deterministic CAGR Projections</h3>
+                    <p>Derive unstated future valuations using mathematically verified compounding formulas, explicit base-year caveats, and zero floating-point hallucination.</p>
+                    <span class="landing-card-link" onclick="openAuthModal()">Access Tools <i class="fa-solid fa-arrow-right"></i></span>
+                </div>
+                <div class="landing-card">
+                    <div class="landing-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                    <h3>Strict Entitlement Enforcement</h3>
+                    <p>Rigorous role-based metadata access control ensures corporate clients only ever access the specific market volumes and reports they have purchased.</p>
+                    <span class="landing-card-link" onclick="openAuthModal()">Client Portal <i class="fa-solid fa-arrow-right"></i></span>
+                </div>
+            </div>
+        </section>
     </div>
 
-    <!-- 4. Main Two-Column Container -->
-    <div class="app-container">
-        
-        <!-- Left Sidebar: Client Library & Entitlements -->
+    <!-- VIEW 2: Authenticated Copilot Chat View (Loaded upon Login) -->
+    <div id="viewCopilot" style="display: none;">
+        <!-- 3. Portal Sub-Banner -->
+        <div class="portal-sub-banner">
+            <div>
+                <h3>
+                    <i class="fa-solid fa-compass" style="color: #00a8cc;"></i>
+                    Project Atlas — Report Copilot
+                    <span class="badge-live-copilot">Active Agent</span>
+                </h3>
+                <p>Non-autoregressive Laya decision router with entitlement-filtered RAG & citation verification.</p>
+            </div>
+            <div class="portal-actions">
+                <a href="javascript:void(0)" class="btn-view-library" onclick="triggerQuickQuery('What reports are in your library?')">
+                    <i class="fa-solid fa-database"></i> Database Summary
+                </a>
+                <a href="javascript:void(0)" class="btn-view-library" onclick="triggerQuickQuery('Why do R-101 and R-102 disagree on 2024?')">
+                    <i class="fa-solid fa-code-compare"></i> Compare R-101 vs R-102
+                </a>
+            </div>
+        </div>
+
+        <!-- 4. Main Two-Column Container -->
+        <div class="app-container">
+            
+            <!-- Left Sidebar: Client Library & Entitlements -->
         <aside class="library-sidebar">
             <div class="sidebar-section-title">
                 <i class="fa-solid fa-folder-open"></i> Purchased Reports
@@ -195,6 +270,7 @@
         </section>
 
     </div>
+    </div>
 
     <!-- 5. Corporate Footer -->
     <footer class="main-footer">
@@ -219,13 +295,34 @@
         const loginClientSelect = document.getElementById('loginClientSelect');
         const currentCompanyName = document.getElementById('currentCompanyName');
         const currentClientIdBadge = document.getElementById('currentClientIdBadge');
+        const authProfileContainer = document.getElementById('authProfileContainer');
+        const btnHeaderLogin = document.getElementById('btnHeaderLogin');
+        const viewLanding = document.getElementById('viewLanding');
+        const viewCopilot = document.getElementById('viewCopilot');
+        const navHome = document.getElementById('navHome');
+        const navCopilot = document.getElementById('navCopilot');
 
-        // Corporate Client Session State
-        let activeClient = {
-            id: 'C-01',
-            company: 'Northwind Utilities',
-            email: 'ops@northwind.example.com'
-        };
+        // Corporate Client Session State (Null by default on Landing Page)
+        let activeClient = null;
+
+        // View Navigation
+        function navigateTo(targetView) {
+            if (targetView === 'copilot') {
+                if (!activeClient) {
+                    openAuthModal();
+                    return;
+                }
+                viewLanding.style.display = 'none';
+                viewCopilot.style.display = 'block';
+                navCopilot.classList.add('active');
+                navHome.classList.remove('active');
+            } else {
+                viewLanding.style.display = 'block';
+                viewCopilot.style.display = 'none';
+                navHome.classList.add('active');
+                navCopilot.classList.remove('active');
+            }
+        }
 
         // Modal Controls
         function openAuthModal() {
@@ -271,6 +368,8 @@
 
             currentCompanyName.textContent = activeClient.company;
             currentClientIdBadge.textContent = activeClient.id;
+            authProfileContainer.style.display = 'flex';
+            btnHeaderLogin.style.display = 'none';
 
             closeAuthModal();
             updateSidebarEntitlements();
@@ -280,6 +379,15 @@
                 answer: `Welcome back, **${activeClient.company}** (${activeClient.id}). Your secure enterprise session is active. You have full analytical clearance to query your licensed research reports. How can I assist your team today?`,
                 confidence: 1.0
             });
+
+            navigateTo('copilot');
+        }
+
+        function signOutClient() {
+            activeClient = null;
+            authProfileContainer.style.display = 'none';
+            btnHeaderLogin.style.display = 'flex';
+            navigateTo('home');
         }
 
         function submitClientSignup() {
@@ -290,6 +398,8 @@
             activeClient = { id: cid, company: company, email: email };
             currentCompanyName.textContent = activeClient.company;
             currentClientIdBadge.textContent = activeClient.id;
+            authProfileContainer.style.display = 'flex';
+            btnHeaderLogin.style.display = 'none';
 
             closeAuthModal();
             updateSidebarEntitlements();
@@ -299,9 +409,15 @@
                 answer: `Welcome to Project Atlas, **${activeClient.company}** (${activeClient.id}). Your client account registration is confirmed.`,
                 confidence: 1.0
             });
+
+            navigateTo('copilot');
         }
 
         async function updateSidebarEntitlements() {
+            if (!activeClient) {
+                entitlementList.innerHTML = '';
+                return;
+            }
             const cid = activeClient.id;
             entitlementList.innerHTML = '<div style="font-size: 0.78rem; color: #64748b; padding: 0.5rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading entitled reports...</div>';
 

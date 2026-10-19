@@ -37,19 +37,26 @@
         </a>
 
         <nav class="header-nav">
-            <a href="#" class="nav-link">Market Reports</a>
-            <a href="#" class="nav-link">Custom Consulting</a>
-            <a href="#" class="nav-link active">Report Copilot (AI)</a>
-            <a href="#" class="nav-link">Athenaeum Access</a>
+            <a href="javascript:void(0)" class="nav-link active" id="navHome" onclick="navigateTo('home')">Home</a>
+            <a href="javascript:void(0)" class="nav-link" id="navReports" onclick="navigateTo('home')">Market
+                Reports</a>
+            <a href="javascript:void(0)" class="nav-link" id="navCopilot" onclick="navigateTo('copilot')">Report Copilot
+                (AI)</a>
+            <a href="javascript:void(0)" class="nav-link" id="navAthenaeum" onclick="navigateTo('home')">Athenaeum
+                Access</a>
 
             <!-- Corporate Client Account Profile & Switch Session -->
-            <div id="authProfileContainer" class="user-profile-nav">
+            <div id="authProfileContainer" class="user-profile-nav" style="display: none;">
                 <i class="fa-solid fa-building" style="color: var(--cmr-primary-blue);"></i>
-                <span class="company-name" id="currentCompanyName">Northwind Utilities</span>
-                <button class="btn-auth-action" onclick="openAuthModal()" title="Switch Client Account / Log In">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i>
+                <span class="company-name" id="currentCompanyName">Not Signed In</span>
+                <span class="client-tag" id="currentClientIdBadge">Guest</span>
+                <button class="btn-auth-action" onclick="signOutClient()" title="Sign Out of Client Account">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Sign Out
                 </button>
             </div>
+            <button id="btnHeaderLogin" class="btn-login-trigger" onclick="openAuthModal()">
+                <i class="fa-solid fa-user-lock"></i> Sign In
+            </button>
         </nav>
     </header>
 
@@ -62,14 +69,14 @@
                 <p>Authenticate as an enterprise client to access licensed reports</p>
             </div>
             <div class="auth-tabs">
-                <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Client Sign In</button>
-                <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Register Client</button>
+                <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Log In</button>
+                <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Register</button>
             </div>
             <div class="auth-modal-body">
                 <!-- Login View -->
                 <div id="loginFormView">
                     <div class="auth-form-group">
-                        <label for="loginClientSelect">Select Corporate Client Account:</label>
+                        <label for="loginClientSelect">Select your corporate account:</label>
                         <select id="loginClientSelect">
                             <option value="C-01">[C-01] Northwind Utilities (Full Turnkey)</option>
                             <option value="C-02">[C-02] Blue Delta Infra (R-103)</option>
@@ -120,80 +127,158 @@
         </div>
     </div>
 
-    <!-- 3. Portal Sub-Banner -->
-    <div class="portal-sub-banner">
-        <div>
-            <h3>
-                <i class="fa-solid fa-compass" style="color: #00a8cc;"></i>
-                Atlas — Report Copilot
-                <span class="badge-live-copilot">Active Agent</span>
-            </h3>
-        </div>
-    </div>
-
-    <!-- 4. Main Two-Column Container -->
-    <div class="app-container">
-
-        <!-- Left Sidebar: Client Library & Entitlements -->
-        <aside class="library-sidebar">
-            <div class="sidebar-section-title">
-                <i class="fa-solid fa-folder-open"></i> Purchased Reports
+    <!-- VIEW 1: Enterprise Landing Page (Default Home Page) -->
+    <div id="viewLanding" class="landing-view-container">
+        <!-- Hero Section -->
+        <section class="landing-hero">
+            <div class="landing-hero-tag">
+                <i class="fa-solid fa-compass"></i> Next-Gen Market Intelligence Platform
             </div>
-
-            <div id="entitlementList" style="display: flex; flex-direction: column; gap: 0.65rem;">
-                <!-- Populated dynamically based on selected client -->
-            </div>
-
-        </aside>
-
-        <!-- Right Column: Interactive Chat Canvas -->
-        <section class="chat-canvas">
-            <div class="chat-canvas-header">
-            </div>
-
-            <!-- Message Stream -->
-            <div class="chat-stream" id="chatStream">
-                <div class="chat-bubble assistant-bubble">
-                    <div class="answer-content">
-                        Hello! Welcome to the <strong>Cognitive Market Research Report Copilot</strong>.
-                        I have verified your active company license. Ask any factual lookup, growth rate derivation
-                        (CAGR), or cross-report comparison.
-                        <br><br>
-                        <em>Sample queries to try (click to run):</em>
-                        <ul
-                            style="margin-left: 1.25rem; margin-top: 0.5rem; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.4rem;">
-                            <li onclick="triggerQuickQuery('What will the smart water meter market be worth in 2030 in R-101?')"
-                                style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;">
-                                <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "What will the smart
-                                water meter market be worth in 2030 in R-101?"
-                            </li>
-                            <li onclick="triggerQuickQuery('Why does R-101 report $4.21B while R-102 reports $3.87B for 2024?')"
-                                style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;">
-                                <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Why does R-101
-                                report $4.21B while R-102 reports $3.87B for 2024?"
-                            </li>
-                            <li onclick="triggerQuickQuery('Which sector has the most published reports in your database?')"
-                                style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;">
-                                <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Which sector has
-                                the most published reports in your database?"
-                            </li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Input Bar -->
-            <div class="chat-canvas-footer">
-                <div class="chat-input-wrapper">
-                    <textarea id="chatInput" placeholder="Enter your inquiry..." rows="1"></textarea>
-                </div>
-                <button class="btn-send" id="sendBtn">
-                    <i class="fa-solid fa-compass" style="color: #00a8cc;"></i>
-                    <span>Ask Atlas</span>
+            <h1>Cognitive Market Research<br><span>Report Copilot (Atlas)</span></h1>
+            <p>
+                Access verified strategic research, deterministic growth projections, and cross-report discrepancy
+                reconciliation. Empower your executive team with private, entitled AI consulting.
+            </p>
+            <div class="landing-hero-actions">
+                <button class="btn-hero-primary" onclick="openAuthModal()">
+                    <i class="fa-solid fa-lock-open"></i> Client Sign In
                 </button>
+                <button class="btn-hero-secondary" onclick="switchAuthTab('signup'); openAuthModal();">
+                    <i class="fa-solid fa-user-plus"></i> Register Corporate Account
+                </button>
+            </div>
+
+            <!-- Stats Bar -->
+            <div class="landing-stats-grid">
+                <div class="landing-stat-item">
+                    <div class="landing-stat-value">6+</div>
+                    <div class="landing-stat-label">Enterprise Sectors</div>
+                </div>
+                <div class="landing-stat-item">
+                    <div class="landing-stat-value">&lt;35ms</div>
+                    <div class="landing-stat-label">Guardrail Verification</div>
+                </div>
+                <div class="landing-stat-item">
+                    <div class="landing-stat-value">100%</div>
+                    <div class="landing-stat-label">Formula Provenance</div>
+                </div>
+                <div class="landing-stat-item">
+                    <div class="landing-stat-value">Zero</div>
+                    <div class="landing-stat-label">Unauthorized Data Leakage</div>
+                </div>
             </div>
         </section>
 
+        <!-- Features Showcase -->
+        <section class="landing-features">
+            <div class="landing-features-header">
+                <h2>Precision Market Intelligence at Scale</h2>
+                <p>Built specifically for institutional investors, utilities, and industrial equipment manufacturers</p>
+            </div>
+            <div class="landing-cards-grid">
+                <div class="landing-card">
+                    <div class="landing-card-icon"><i class="fa-solid fa-code-compare"></i></div>
+                    <h3>Conflict & Discrepancy Reconciliation</h3>
+                    <p>Detect methodology differences across publishers (e.g. Turnkey vs Hardware-only scope) with full
+                        context transparency instead of arbitrary averaging.</p>
+                    <span class="landing-card-link" onclick="openAuthModal()">Explore Copilot <i
+                            class="fa-solid fa-arrow-right"></i></span>
+                </div>
+                <div class="landing-card">
+                    <div class="landing-card-icon"><i class="fa-solid fa-calculator"></i></div>
+                    <h3>Deterministic CAGR Projections</h3>
+                    <p>Derive unstated future valuations using mathematically verified compounding formulas, explicit
+                        base-year caveats, and zero floating-point hallucination.</p>
+                    <span class="landing-card-link" onclick="openAuthModal()">Access Tools <i
+                            class="fa-solid fa-arrow-right"></i></span>
+                </div>
+                <div class="landing-card">
+                    <div class="landing-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
+                    <h3>Strict Entitlement Enforcement</h3>
+                    <p>Rigorous role-based metadata access control ensures corporate clients only ever access the
+                        specific market volumes and reports they have purchased.</p>
+                    <span class="landing-card-link" onclick="openAuthModal()">Client Portal <i
+                            class="fa-solid fa-arrow-right"></i></span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- VIEW 2: Authenticated Copilot Chat View (Loaded upon Login) -->
+    <div id="viewCopilot" style="display: none;">
+        <!-- 3. Portal Sub-Banner -->
+        <div class="portal-sub-banner">
+            <div>
+                <h3>
+                    <i class="fa-solid fa-compass" style="color: #00a8cc;"></i>
+                    Atlas — Report Copilot
+                    <span class="badge-live-copilot">Active Agent</span>
+                </h3>
+            </div>
+        </div>
+
+        <!-- 4. Main Two-Column Container -->
+        <div class="app-container">
+            <!-- Left Sidebar: Client Library & Entitlements -->
+            <aside class="library-sidebar">
+                <div class="sidebar-section-title">
+                    <i class="fa-solid fa-folder-open"></i> Purchased Reports
+                </div>
+                <div id="entitlementList" style="display: flex; flex-direction: column; gap: 0.65rem;">
+                    <!-- Populated dynamically based on selected client -->
+                </div>
+            </aside>
+
+            <!-- Right Column: Interactive Chat Canvas -->
+            <section class="chat-canvas">
+                <div class="chat-canvas-header">
+                </div>
+
+                <!-- Message Stream -->
+                <div class="chat-stream" id="chatStream">
+                    <div class="chat-bubble assistant-bubble">
+                        <div class="answer-content">
+                            Hello! Welcome to the <strong>Cognitive Market Research Report Copilot</strong>.
+                            I have verified your active company license. Ask any factual lookup, growth rate derivation
+                            (CAGR), or cross-report comparison.
+                            <br><br>
+                            <em>Sample queries to try (click to run):</em>
+                            <ul
+                                style="margin-left: 1.25rem; margin-top: 0.5rem; font-size: 0.88rem; display: flex; flex-direction: column; gap: 0.4rem;">
+                                <li onclick="triggerQuickQuery('What will the smart water meter market be worth in 2030 in R-101?')"
+                                    style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;">
+                                    <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "What will the
+                                    smart
+                                    water meter market be worth in 2030 in R-101?"
+                                </li>
+                                <li onclick="triggerQuickQuery('Why does R-101 report $4.21B while R-102 reports $3.87B for 2024?')"
+                                    style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;">
+                                    <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Why does R-101
+                                    report $4.21B while R-102 reports $3.87B for 2024?"
+                                </li>
+                                <li onclick="triggerQuickQuery('Which sector has the most published reports in your database?')"
+                                    style="cursor: pointer; color: var(--cmr-primary-blue); font-weight: 500; transition: all 0.2s;">
+                                    <i class="fa-solid fa-arrow-right" style="font-size: 0.75rem;"></i> "Which sector
+                                    has
+                                    the most published reports in your database?"
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Bar -->
+                <div class="chat-canvas-footer">
+                    <div class="chat-input-wrapper">
+                        <textarea id="chatInput" placeholder="Enter your inquiry..." rows="1"></textarea>
+                    </div>
+                    <button class="btn-send" id="sendBtn">
+                        <i class="fa-solid fa-compass" style="color: #00a8cc;"></i>
+                        <span>Ask Atlas</span>
+                    </button>
+                </div>
+            </section>
+        </div>
     </div>
 
     <!-- 5. Corporate Footer -->
