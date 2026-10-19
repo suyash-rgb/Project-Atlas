@@ -355,6 +355,7 @@
     </footer>
 
     <!-- Interactive Logic -->
+    <script src="<?php echo base_url('assets/js/markdown.js'); ?>"></script>
     <script>
         const chatStream = document.getElementById('chatStream');
         const chatInput = document.getElementById('chatInput');
@@ -613,15 +614,8 @@
             }
             html += '</div>';
 
-            // Escape all HTML to prevent XSS, then format simple markdown
             const rawAnswer = data.answer || data.message || 'No answer generated.';
-            const safeAnswer = escapeHtml(rawAnswer);
-            const formattedAnswer = safeAnswer
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                .replace(/\n\n/g, '<br><br>')
-                .replace(/\n/g, '<br>');
+            const formattedAnswer = window.renderAtlasMarkdown(rawAnswer);
 
             html += `<div class="answer-content">${formattedAnswer}</div>`;
 
@@ -780,7 +774,8 @@
                 const streamUrl = '<?php echo site_url("chat/stream"); ?>'.replace(/^https?:\/\/[^\/]+/, window.location.origin);
                 const reqHeaders = {
                     'Content-Type': 'application/json',
-                    'Accept': 'text/event-stream'
+                    'Accept': 'text/event-stream',
+                    'X-Requested-With': 'XMLHttpRequest'
                 };
                 if (csrfHash) {
                     reqHeaders['X-CSRF-Token'] = csrfHash;

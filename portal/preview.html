@@ -368,6 +368,7 @@
     </footer>
 
     <!-- Interactive Logic -->
+    <script src="assets/js/markdown.js"></script>
     <script>
         const chatStream = document.getElementById('chatStream');
         const chatInput = document.getElementById('chatInput');
@@ -596,13 +597,9 @@
             }
             html += '</div>';
 
-            // Render simple markdown in answer
-            let formattedAnswer = (data.answer || data.message || 'No answer generated.')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\*(.*?)\*/g, '<em>$1</em>')
-                .replace(/`([^`]+)`/g, '<code>$1</code>')
-                .replace(/\n\n/g, '<br><br>')
-                .replace(/\n/g, '<br>');
+            const formattedAnswer = window.renderAtlasMarkdown(
+                data.answer || data.message || 'No answer generated.'
+            );
 
             html += `<div class="answer-content">${formattedAnswer}</div>`;
 
@@ -756,7 +753,8 @@
             const streamUrl = isDirect ? 'http://127.0.0.1:8085/api/v1/chat/stream' : '/index.php/chat/stream';
             const headers = {
                 'Content-Type': 'application/json',
-                'Accept': 'text/event-stream'
+                'Accept': 'text/event-stream',
+                'X-Requested-With': 'XMLHttpRequest'
             };
             if (isDirect) {
                 headers['X-API-Key'] = 'atlas_dev_secret_key';
