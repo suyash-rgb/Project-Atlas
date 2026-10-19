@@ -1,6 +1,6 @@
 import time
 import logging
-from typing import Callable, Optional
+from typing import Callable, Dict, List, Optional
 from app.schemas.chat import ChatResponse
 from app.agent.graph import run_agent_workflow
 from app.core.telemetry import telemetry
@@ -26,6 +26,7 @@ class ChatService:
         self,
         client_id: str,
         question: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None,
         token_callback: Optional[Callable[[str], None]] = None,
     ) -> ChatResponse:
         """
@@ -46,17 +47,25 @@ class ChatService:
 
         cleaned_client = client_id.strip().upper()
         cleaned_question = question.strip()
+        history = conversation_history or []
 
         with trace_observation(
             name="chat_cache_lookup",
-            metadata={"cache_layers": ["exact_lru", "semantic"]},
+            metadata={
+                "cache_layers": ["exact_lru", "semantic"],
+                "contextual_query": bool(history),
+            },
         ) as cache_observation:
             cache_layer = "miss"
-            cached_response = telemetry.cache.get(cleaned_client, cleaned_question)
+            cached_response = (
+                None
+                if history
+                else telemetry.cache.get(cleaned_client, cleaned_question)
+            )
 
             if cached_response is not None:
                 cache_layer = "exact_lru"
-            else:
+            elif not history:
                 semantic_data = semantic_cache.get(cleaned_client, cleaned_question)
                 if semantic_data is not None:
                     try:
@@ -106,6 +115,7 @@ class ChatService:
             response: ChatResponse = run_agent_workflow(
                 client_id=cleaned_client,
                 question=cleaned_question,
+                conversation_history=history,
                 token_callback=token_callback,
             )
             latency_ms = (time.time() - t0) * 1000
@@ -115,8 +125,9 @@ class ChatService:
             completion_tokens = int(len(response.answer.split()) * 1.35)
 
             # Store in query caches (Exact LRU + Redis Vector Semantic Cache)
-            telemetry.cache.set(cleaned_client, cleaned_question, response)
-            semantic_cache.set(cleaned_client, cleaned_question, response)
+            if not history:
+                telemetry.cache.set(cleaned_client, cleaned_question, response)
+                semantic_cache.set(cleaned_client, cleaned_question, response)
 
             # Record telemetry (Structured log + Langfuse if active)
             telemetry.record_request(

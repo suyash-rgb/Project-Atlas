@@ -20,7 +20,9 @@ def test_mock_streaming_tokens_in_sequence(client, auth_headers):
         "USD 6.84B by 2030."
     ]
 
-    def mock_process_chat_query(client_id, question, token_callback=None):
+    def mock_process_chat_query(
+        client_id, question, conversation_history=None, token_callback=None
+    ):
         assert client_id == "C-01"
         for token in mock_tokens:
             if token_callback:
@@ -90,7 +92,9 @@ def test_mock_streaming_divergence_and_conflict_handling(client, auth_headers):
         "whereas R-102 ($3.87B) includes utility billing software suites."
     ]
 
-    def mock_conflict_query(client_id, question, token_callback=None):
+    def mock_conflict_query(
+        client_id, question, conversation_history=None, token_callback=None
+    ):
         for token in conflict_tokens:
             if token_callback:
                 token_callback(token)

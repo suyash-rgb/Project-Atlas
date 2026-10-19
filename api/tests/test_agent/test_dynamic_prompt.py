@@ -95,6 +95,10 @@ def test_synthesizer_uses_dynamic_prompt_matching_intent():
     result = synthesizer.synthesize(
         query="What is the 2030 projection?",
         retrieved_chunks=[mock_chunk],
+        conversation_history=[
+            {"role": "user", "content": "What was the 2024 value?"},
+            {"role": "assistant", "content": "It was USD 4.21B [R-101 p.8]."},
+        ],
         intent="calculation",
     )
 
@@ -106,3 +110,6 @@ def test_synthesizer_uses_dynamic_prompt_matching_intent():
     assert "CALCULATION DIRECTIVES" in system_msg["content"]
     assert "CAGR formula" in system_msg["content"]
     assert "STRICT GROUNDING" in system_msg["content"]
+    user_msg = next(m for m in messages if m["role"] == "user")
+    assert "context only; not evidence" in user_msg["content"]
+    assert "What was the 2024 value?" in user_msg["content"]
