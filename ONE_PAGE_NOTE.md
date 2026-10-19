@@ -35,16 +35,21 @@ Here are the 5 high-impact initiatives I would execute, organized by technical l
 
 ---
 
-### 4. Active Continuous Fine-Tuning Pipeline for Laya Guardrails
-* **Current State**: The fine-tuned Laya 421M model operates on pre-quantized weights for sub-40ms routing and perimeter defense.
+### 4. Active Continuous Fine-Tuning Loop for Guardrails & Routing
+* **Current State**: The fine-tuned Laya 421M model operates on pre-quantized weights for sub-40ms routing and perimeter defense, trained on our initial 1,260 curated samples.
 * **One-Week Enhancement**:
-  - Build an automated **Active Learning Ingestion Loop**: thumbs-down user feedback and human escalation tickets stored in MySQL `feedback` and `escalations` tables will automatically be exported into synthetic DPO (Direct Preference Optimization) training pairs.
-  - Trigger a nightly LoRA retraining job on an internal GPU instance, automatically updating the Laya router model registry with zero downtime.
+  - Build an automated **Continuous Hard-Negative Mining Loop**: user feedback (thumbs down) and human escalation tickets stored in the MySQL `feedback` and `escalations` tables will automatically be extracted and labelled.
+  - Formulate structured supervised retraining datasets from edge-case client queries that exhibited boundary ambiguity.
+  - Trigger a scheduled weekly retraining and ONNX export pipeline, continuously hardening the guardrail router against newly emerging prompt injection and exfiltration patterns with zero downtime.
 
 ---
 
-### 5. Production Infrastructure, CDN Edge Caching & Kubernetes Helm Charts
-* **Current State**: Docker Compose provides single-command local and single-node Linux VPS deployment.
+### 5. Native Langfuse Telemetry & Observability Integration in the Admin Portal
+* **Current State**: 
+  - To gain deep operational visibility, I instrumented the core agent workflow with `@observe` decorators and contextual spans (`report_copilot_pipeline`, `read_only_sql`, `reconcile_report_conflicts`, `extract_calculation_inputs`, `llm_synthesizer`, `entitlement_filtered_retrieval`, and `guardrail_router`).
+  - This successfully captured **2,400+ traces**, **4,410+ nested observations**, latency percentiles (p50–p99 across nodes), and cost telemetry ($0.01 across 171.8K tokens) in our Langfuse dashboard.
+  - However, because these rich analytics currently reside inside the external Langfuse SaaS cloud, non-technical business stakeholders and platform administrators cannot view them directly within our CodeIgniter 3 web portal.
 * **One-Week Enhancement**:
-  - Author production-grade **Helm Charts** for Kubernetes deployment with Horizontal Pod Autoscaling (HPA) based on Redis queue depth and SSE connection concurrency.
-  - Configure **Cloudflare Edge Workers** with Cache-Control headers to serve cached semantic responses directly from edge nodes with sub-10ms TTFB (Time-To-First-Byte) for global enterprise clients across North America, Europe, and APAC.
+  - **Embedded Stakeholder Analytics Dashboard**: Build a dedicated *Analytics & Model Governance* tab directly inside the CodeIgniter 3 Admin Portal, consuming the Langfuse REST API (`/api/public/traces`, `/api/public/metrics`, `/api/public/sessions`).
+  - **Native Real-Time KPI Cards**: Surface live system health metrics directly to executives: average query latency, cost-per-client breakdown, token volume trends, and node-level bottlenecks (e.g., comparing p50 vs p95 generation latency) without requiring external SaaS access.
+  - **Automated Score Tracking**: Activate Langfuse automated evaluator scores (currently at 0 in our prototype) to systematically track factual grounding, citation precision, and hallucination rates across all client conversations.
