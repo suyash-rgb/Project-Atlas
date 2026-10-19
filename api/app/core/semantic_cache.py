@@ -96,7 +96,7 @@ class RedisSemanticCache:
 
         try:
             from redis.commands.search.field import TagField, TextField, VectorField
-            from redis.commands.search.indexDefinition import IndexDefinition, IndexType
+            from redis.commands.search.index_definition import IndexDefinition, IndexType
 
             try:
                 self._redis_client.ft(self.INDEX_NAME).info()
