@@ -8,6 +8,14 @@ Agentic AI Assistant & Report Copilot for Cognitive Market Research and Consulti
 
 Project Atlas orchestrates an entitlement-aware multi-step agent workflow to analyze market research reports, detect conflicting metrics, safely query structured SQL databases, and calculate derived market projections with full citations and guardrails.
 
+### 🧩 Workflow Pattern: **Hybrid Router-Evaluator-Optimizer (System-1 + System-2)**
+Project Atlas follows a **Hybrid Agentic Pattern** combining:
+1. **System-1 Reactive Routing**: Sub-40ms Laya 421M ONNX model classifies query intent and acts as an immediate security perimeter gatekeeper.
+2. **Deterministic Orchestrated Tools**: Read-only AST SQL tool, BGE-Small + TF-IDF RRF hybrid retriever, PyMuPDF multimodal vision, and pure-math CAGR calculator.
+3. **Evaluator-Optimizer Critic Loop**: Pre-synthesis methodology conflict reconciler (R-101 vs R-102) and post-synthesis citation verification (`AnswerGroundingError` critic).
+
+![n8n Style Agentic Architecture Workflow](docs/assets/n8n_architecture_workflow.jpg)
+
 ```mermaid
 flowchart TD
     %% Styling
@@ -280,6 +288,38 @@ and emits request IDs, status codes, durations, and categorized dependency or
 agent failures. Logs intentionally omit API/database passwords and raw chat
 questions. For a single request, correlate the `X-Request-ID` response header
 with API and portal logs.
+
+### Report ingestion and chart extraction
+
+The authenticated `POST /api/v1/ingest` endpoint accepts either a `content`
+string or a `pages` array. Use `pages` with one-based `page_number` values when
+the source page is known; that preserves accurate page citations. Flat `content`
+is treated as one unpaginated source page. Combined text is limited to 2,000,000
+characters per request. Ingestion updates the relational report metadata and
+the vector/lexical indexes, but it does not grant any client's paid-report
+entitlement; purchases must be maintained separately in the client record.
+
+The corpus indexing command scans the PDF files in `REPORTS_DIR`. It indexes extractable
+page text and embedded raster images that pass image validation and the minimum
+size filter. If `GEMINI_API_KEY` is configured, chart images are summarized
+using `GEMINI_MODEL`; without it, the chart location is still indexed as
+fallback context. Vector-drawn PDF charts are not extracted by this image path.
+Chart summaries are cached by image contents, report/page position, model, and
+prompt version. Run it from the repository root to index the corpus when the
+Chroma collection is empty:
+
+```powershell
+uv run python scripts/ingest_report_corpus.py
+```
+
+The command skips a collection when every source report and its embedded-chart
+coverage are already indexed. `--force-reload` replaces the entire report
+collection (including documents added through the text-ingestion API) and should
+only be used when deliberately rebuilding all embeddings.
+
+The `CHROMA_PERSIST_DIRECTORY`, `REPORTS_DIR`, and `CHART_CACHE_DIR` settings
+control local storage locations. `CORS_ALLOWED_ORIGINS` is a JSON array of
+browser origins; the defaults cover the local portal ports.
 
 ### Streaming chat responses
 

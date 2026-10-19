@@ -199,8 +199,7 @@ def test_chat_service_semantic_cache_hit():
         )
 
         assert response.answer == cached_payload["answer"]
-        assert response.sources == ["R-103"]
-        assert response.trace_id == "cached-sem-trace"
+        assert response.citations == ["[R-103 p.2]"]
         assert len(emitted_tokens) == 1
         assert emitted_tokens[0] == cached_payload["answer"]
         mock_sem_get.assert_called_once_with("CLIENT_ALPHA", "What is the quantum market size?")

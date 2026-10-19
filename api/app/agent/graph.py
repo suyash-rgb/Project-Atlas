@@ -298,6 +298,7 @@ def synthesizer_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any
             conflicts=state.get("conflicts", []),
             derived_values=state.get("derived_values", []),
             token_callback=token_callback,
+            intent=state.get("intent"),
         )
     except AnswerGroundingError as exc:
         reason = "The generated answer could not be verified against cited report pages."
