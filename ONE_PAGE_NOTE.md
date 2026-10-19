@@ -1,8 +1,7 @@
 # What I Would Do With One More Week
-### Engineering Roadmap & Production Evolution | Project Atlas
-**Author**: Lead AI Software Developer  
-**Project**: Project Atlas — Cognitive Market Research & Consulting  
 
+
+### Engineering Roadmap & Production Evolution | Project Atlas
 ---
 
 If granted an additional week of focused engineering time on Project Atlas, I would transition the system from its current **high-performing prototype architecture** to a **globally distributed, enterprise-hardened PaaS deployment**. 
