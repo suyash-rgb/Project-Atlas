@@ -10,9 +10,12 @@ chat_router = import_module("app.api.v1.routers.chat")
 def test_stream_endpoint_emits_tokens_then_structured_completion(
     client, auth_headers, monkeypatch, caplog
 ):
-    def fake_process_chat_query(client_id, question, token_callback=None):
+    def fake_process_chat_query(
+        client_id, question, conversation_history=None, token_callback=None
+    ):
         assert client_id == "C-01"
         assert question == "What is the market size?"
+        assert conversation_history == []
         token_callback("The market ")
         token_callback("is USD 4.21B.")
         return ChatResponse(

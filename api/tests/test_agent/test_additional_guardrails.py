@@ -92,6 +92,20 @@ def test_chat_request_rejects_oversized_fields(field, value):
         ChatRequest.model_validate(payload)
 
 
+def test_chat_request_limits_context_history_size():
+    payload = {
+        "client_id": "C-01",
+        "question": "Follow up",
+        "conversation_history": [
+            {"role": "user", "content": f"turn {index}"}
+            for index in range(9)
+        ],
+    }
+
+    with pytest.raises(ValueError):
+        ChatRequest.model_validate(payload)
+
+
 def test_synthesizer_logs_embedded_injection_and_keeps_report_facts(caplog):
     synthesizer = LLMSynthesizer.__new__(LLMSynthesizer)
     synthesizer.client = Mock()

@@ -62,7 +62,12 @@ class Chat extends CI_Controller {
         }
 
         // Send query to Python FastAPI service via Atlas_client
-        $response = $this->atlas_client->send_chat($client['id'], $query);
+        $history = $this->load_recent_conversation_history($client['id']);
+        if ($history === false) {
+            $this->json_error(503, 'Conversation context is temporarily unavailable.');
+            return;
+        }
+        $response = $this->atlas_client->send_chat($client['id'], $query, $history);
 
         // Persist conversation if database is active and response succeeded
         if (isset($this->db) && isset($this->db->conn_id) && $this->db->conn_id && isset($response['data'])) {
@@ -124,7 +129,65 @@ class Chat extends CI_Controller {
             return;
         }
 
-        $this->atlas_client->stream_chat($client['id'], $query);
+        $history = $this->load_recent_conversation_history($client['id']);
+        if ($history === false) {
+            $this->json_error(503, 'Conversation context is temporarily unavailable.');
+            return;
+        }
+        $this->atlas_client->stream_chat($client['id'], $query, $history);
+    }
+
+    private function load_recent_conversation_history($client_id) {
+        $session_id = $this->session->userdata('conversation_session_id');
+        if (
+            !isset($this->db)
+            || !isset($this->db->conn_id)
+            || !$this->db->conn_id
+            || !$session_id
+        ) {
+            return array();
+        }
+
+        $query = $this->db
+            ->select('question, answer')
+            ->from('conversations')
+            ->where('session_id', $session_id)
+            ->where('client_id', $client_id)
+            ->order_by('id', 'DESC')
+            ->limit(4)
+            ->get();
+        if ($query === false) {
+            log_message('error', 'Failed to load recent conversation context.');
+            return false;
+        }
+
+        $rows = $query->result_array();
+
+        foreach ($rows as &$row) {
+            $row['question'] = $this->limit_history_text($row['question']);
+            $row['answer'] = $this->limit_history_text($row['answer']);
+        }
+        unset($row);
+        $rows = array_reverse($rows);
+
+        $history = array();
+        foreach ($rows as $row) {
+            if ($row['question'] !== '') {
+                $history[] = array('role' => 'user', 'content' => $row['question']);
+            }
+            if ($row['answer'] !== '') {
+                $history[] = array('role' => 'assistant', 'content' => $row['answer']);
+            }
+        }
+        return $history;
+    }
+
+    private function limit_history_text($text) {
+        $text = (string) $text;
+        if (preg_match('/\A.{0,2000}/us', $text, $matches) === 1) {
+            return $matches[0];
+        }
+        return substr($text, 0, 2000);
     }
 
     public function reports() {

@@ -36,6 +36,7 @@ logger = logging.getLogger("project_atlas.agent.graph")
 class AgentState(TypedDict):
     client_id: str
     question: str
+    conversation_history: List[Dict[str, str]]
     purchased_reports: List[str]
     intent: str
     router_confidence: float
@@ -369,6 +370,7 @@ def synthesizer_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any
             sql_data=state.get("sql_data", []),
             conflicts=state.get("conflicts", []),
             derived_values=state.get("derived_values", []),
+            conversation_history=state.get("conversation_history", []),
             token_callback=token_callback,
             intent=state.get("intent"),
         )
@@ -485,6 +487,7 @@ def get_agent_graph():
 def run_agent_workflow(
     client_id: str,
     question: str,
+    conversation_history: Optional[List[Dict[str, str]]] = None,
     token_callback: Optional[Callable[[str], None]] = None,
 ) -> ChatResponse:
     """
@@ -501,11 +504,30 @@ def run_agent_workflow(
             entitlement_observation.update(
                 metadata={"entitled_report_count": len(purchased)}
             )
+    history = conversation_history or []
+    routed_question = question
+    if history:
+        # Check the unmodified user message before using any prior conversation context.
+        raw_decision = classify_query(question)
+        if not raw_decision.is_attack:
+            resolution = get_synthesizer().resolve_follow_up(question, history)
+            if resolution["needs_clarification"]:
+                return ChatResponse(
+                    answer=resolution["clarification_question"],
+                    citations=[],
+                    confidence=0.0,
+                    clarification_needed=True,
+                )
+            routed_question = resolution["standalone_question"]
+
     graph = get_agent_graph()
 
     initial_state: AgentState = {
         "client_id": client_id,
-        "question": question,
+        "question": routed_question,
+        "conversation_history": (
+            history + [{"role": "user", "content": question}] if history else []
+        ),
         "purchased_reports": purchased,
         "intent": "factual_lookup",
         "router_confidence": 1.0,

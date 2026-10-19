@@ -63,7 +63,10 @@ async def chat(
     try:
         return chat_service.process_chat_query(
             client_id=request.client_id,
-            question=request.question
+            question=request.question,
+            conversation_history=[
+                turn.model_dump() for turn in request.conversation_history
+            ],
         )
     except ValueError as ve:
         raise HTTPException(
@@ -120,6 +123,9 @@ async def stream_chat(
             response = chat_service.process_chat_query(
                 client_id=request.client_id,
                 question=request.question,
+                conversation_history=[
+                    turn.model_dump() for turn in request.conversation_history
+                ],
                 token_callback=lambda token: events.put(("token", {"text": token})),
             )
             events.put(("complete", {"response": response.model_dump(mode="json")}))

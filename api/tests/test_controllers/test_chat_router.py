@@ -60,7 +60,14 @@ class TestChatRouter:
 
         response = client.post(
             "/api/v1/chat",
-            json={"client_id": "C-01", "question": "What was the 2024 market size?"},
+            json={
+                "client_id": "C-01",
+                "question": "What about 2030?",
+                "conversation_history": [
+                    {"role": "user", "content": "What was the R-101 market size?"},
+                    {"role": "assistant", "content": "The market was USD 4.21B [R-101 p.8]."},
+                ],
+            },
             headers=auth_headers
         )
         assert response.status_code == 200
@@ -70,6 +77,14 @@ class TestChatRouter:
         assert data["citations"][0] == "[R-101 p.8]"
         assert data["confidence"] == 0.95
         assert len(data["conflicts"]) == 1
+        mock_process.assert_called_once_with(
+            client_id="C-01",
+            question="What about 2030?",
+            conversation_history=[
+                {"role": "user", "content": "What was the R-101 market size?"},
+                {"role": "assistant", "content": "The market was USD 4.21B [R-101 p.8]."},
+            ],
+        )
 
     @patch("app.services.chat_service.chat_service.process_chat_query")
     def test_chat_timeout_returns_504(self, mock_process, client, auth_headers):

@@ -47,10 +47,11 @@ class Atlas_client {
      * @param string $query      The question text
      * @return array
      */
-    public function send_chat($client_id, $query) {
+    public function send_chat($client_id, $query, $conversation_history = array()) {
         $payload = array(
             'client_id' => $client_id,
-            'query'     => $query
+            'query'     => $query,
+            'conversation_history' => $conversation_history
         );
         return $this->_send_request('/api/v1/chat', 'POST', $payload);
     }
@@ -65,11 +66,12 @@ class Atlas_client {
     /**
      * Relay the FastAPI Server-Sent Events response to the browser without buffering.
      */
-    public function stream_chat($client_id, $query) {
+    public function stream_chat($client_id, $query, $conversation_history = array()) {
         $url = rtrim($this->api_base_url, '/') . '/api/v1/chat/stream';
         $payload = json_encode(array(
             'client_id' => $client_id,
-            'query'     => $query
+            'query'     => $query,
+            'conversation_history' => $conversation_history
         ));
 
         if ($payload === false) {

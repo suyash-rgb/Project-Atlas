@@ -40,6 +40,7 @@ class TestChatService:
         mock_workflow.assert_called_once_with(
             client_id="C-01",
             question="What is CAGR?",
+            conversation_history=[],
             token_callback=None,
         )
 
@@ -60,8 +61,31 @@ class TestChatService:
         mock_workflow.assert_called_once_with(
             client_id="C-01",
             question="Stream this response",
+            conversation_history=[],
             token_callback=chunks.append,
         )
+
+    @patch("app.services.chat_service.run_agent_workflow")
+    def test_contextual_query_skips_caches_and_forwards_history(
+        self, mock_workflow, sample_chat_response
+    ):
+        history = [{"role": "user", "content": "What is the market size?"}]
+        mock_workflow.return_value = sample_chat_response
+
+        response = self.service.process_chat_query(
+            client_id="C-01",
+            question="What about 2030?",
+            conversation_history=history,
+        )
+
+        assert response is sample_chat_response
+        mock_workflow.assert_called_once_with(
+            client_id="C-01",
+            question="What about 2030?",
+            conversation_history=history,
+            token_callback=None,
+        )
+        assert telemetry.cache.get("C-01", "What about 2030?") is None
 
     @patch("app.services.chat_service.run_agent_workflow")
     def test_cached_response_is_emitted_to_stream_callback(self, mock_workflow, sample_chat_response):
