@@ -5,9 +5,15 @@ Unit and integration tests for EntitlementRetriever and vector filtering safegua
 from unittest.mock import MagicMock, Mock, patch
 import pytest
 
-from app.agent.tools.retriever import EntitlementRetriever, RetrievedChunk, get_retriever
+from app.agent.tools.retriever import (
+    EntitlementRetriever,
+    RetrievedChunk,
+    get_retriever,
+    fetch_report_metadata,
+    get_public_report_ids,
+)
 from app.agent.tools.hybrid import TFIDFIndex, reciprocal_rank_fusion, tokenize
-from app.agent.tools.utils import fetch_report_metadata, get_public_report_ids
+from app.agent.tools.reranker import SemanticReRanker, get_reranker
 
 
 class FakeNode:
@@ -246,3 +252,38 @@ def test_hybrid_retriever_exact_keyword_boost(monkeypatch):
     # The exact keyword match on page 8 should be boosted by RRF to rank 1
     assert results[0].page == 8
     assert results[0].score > results[1].score
+
+
+def test_semantic_reranker_cross_scoring():
+    """Verify that SemanticReRanker boosts items with high query token density and exact matches."""
+    reranker = SemanticReRanker()
+    c1 = RetrievedChunk(
+        report_id="R-101",
+        page=1,
+        text="General economic background without any numbers or specifics.",
+        score=0.5,
+        title="R-101",
+        sector="Utilities",
+        access="paid",
+    )
+    c2 = RetrievedChunk(
+        report_id="R-101",
+        page=8,
+        text="Smart water metering market size reached USD 4.21 B with 11.8% CAGR.",
+        score=0.4,  # Lower initial score
+        title="R-101",
+        sector="Utilities",
+        access="paid",
+    )
+
+    reranked = reranker.rerank(
+        query="What is the smart water 4.21 B market size and CAGR?",
+        candidates=[c1, c2],
+        top_k=2,
+    )
+
+    assert len(reranked) == 2
+    # c2 must be promoted to rank 1 due to exact numbers and high proximity
+    assert reranked[0].page == 8
+    assert reranked[0].score > reranked[1].score
+

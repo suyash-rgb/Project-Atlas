@@ -9,14 +9,12 @@ from sqlglot import exp
 from app.core.config import settings
 from app.core.observability import observe_with_tags
 from app.db.session import get_db_connection
-from app.agent.tools.utils import DATABASE_SCHEMA_DOC, DEFAULT_CLIENT_ENTITLEMENTS
 
 logger = logging.getLogger("project_atlas.sql")
 
 MAX_QUERY_ROWS = 100
 DEFAULT_QUERY_TIMEOUT_SECONDS = 5.0
 
-SCHEMA_DEFINITION = DATABASE_SCHEMA_DOC
 
 
 FORBIDDEN_EXPRESSIONS = (
@@ -193,16 +191,16 @@ def execute_safe_sql(
     tags=["tool:entitlements", "data-access:read-only"],
 )
 def get_client_entitlements(client_id: str) -> List[str]:
-    """Retrieve list of purchased report IDs for a client, plus public excerpts."""
+    """Retrieve list of purchased report IDs for a client, plus public excerpts directly from database."""
     try:
         conn = get_db_connection(readonly=True)
     except Exception as exc:
         logger.warning(
-            "entitlement_lookup_fallback reason=connection_failed client_id=%s error_type=%s",
+            "entitlement_lookup_failed reason=connection_failed client_id=%s error_type=%s",
             client_id,
             type(exc).__name__,
         )
-        return list(DEFAULT_CLIENT_ENTITLEMENTS.get(client_id, ["R-102", "R-105"]))
+        return []
 
     cursor = conn.cursor()
     try:
@@ -231,12 +229,11 @@ def get_client_entitlements(client_id: str) -> List[str]:
         return purchased
     except Exception as exc:
         logger.exception(
-            "entitlement_lookup_fallback reason=query_failed client_id=%s error_type=%s",
+            "entitlement_lookup_failed reason=query_failed client_id=%s error_type=%s",
             client_id,
             type(exc).__name__,
         )
-        return list(DEFAULT_CLIENT_ENTITLEMENTS.get(client_id, ["R-102", "R-105"]))
+        return []
     finally:
         cursor.close()
         conn.close()
-

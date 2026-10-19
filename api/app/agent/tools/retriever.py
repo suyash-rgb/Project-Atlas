@@ -25,6 +25,7 @@ from app.core.observability import observe_with_tags
 from app.db.session import get_db_connection
 from app.agent.tools.hybrid import TFIDFIndex, reciprocal_rank_fusion
 from app.agent.tools.reranker import get_reranker
+from app.agent.tools.chart_extractor import extract_and_summarize_charts_from_pdf
 
 CHROMA_PATH = str(getattr(settings, "CHROMA_DB_PATH", None) or (REPOSITORY_ROOT / "data" / "chroma_db"))
 REPORTS_DIR = str(getattr(settings, "REPORTS_DIR", None) or (REPOSITORY_ROOT / "data" / "reports"))
@@ -212,6 +213,34 @@ class EntitlementRetriever:
                         }
                     )
                     documents.append(doc)
+
+                # Extract and index multimodal visual charts from the report PDF
+                try:
+                    chart_chunks = extract_and_summarize_charts_from_pdf(
+                        pdf_path=file_path,
+                        report_id=report_id,
+                        report_title=str(report_meta.get("title", filename)),
+                    )
+                    for c_info in chart_chunks:
+                        c_doc = Document(
+                            text=c_info["text"],
+                            metadata={
+                                "report_id": report_id,
+                                "page": c_info["page"],
+                                "title": str(report_meta.get("title", filename)),
+                                "publisher": str(report_meta.get("publisher", "Unknown")),
+                                "sector": str(report_meta.get("sector", "General")),
+                                "year": int(report_meta.get("year", 2024)),
+                                "access": str(report_meta.get("access", "paid")),
+                                "source_file": filename,
+                                "type": "chart",
+                            }
+                        )
+                        documents.append(c_doc)
+                    if chart_chunks:
+                        logger.info("multimodal_charts_ingested report_id=%s count=%s", report_id, len(chart_chunks))
+                except Exception as chart_err:
+                    logger.warning("multimodal_chart_ingestion_skipped report_id=%s error=%s", report_id, chart_err)
             except Exception as e:
                 logger.exception(
                     "report_pdf_parse_failed file=%s error_type=%s",

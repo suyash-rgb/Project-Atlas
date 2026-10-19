@@ -126,10 +126,15 @@ flowchart TD
 6. **Observability & Monitoring**:
    - End-to-end tracing, token usage, latency tracking, and request cost auditing via Langfuse / LangSmith.
 
-7. **Hybrid Retrieval (Sparse TF-IDF + Dense Vector + RRF)**:
+7. **Hybrid Retrieval & Semantic Re-Ranker (Sparse TF-IDF + Dense Vector + RRF + Cross-ReRanker)**:
    - Combines sub-millisecond sparse lexical retrieval (TF-IDF inverted index) with dense semantic embeddings (`BAAI/bge-small-en-v1.5` in ChromaDB).
-   - Merges candidate sets via Reciprocal Rank Fusion (RRF, $k=60$) so exact alphanumeric identifiers (`R-101`, `USD 4.21 B`, `11.8% CAGR`) are boosted without losing conceptual semantic recall.
+   - Pools candidate sets via Reciprocal Rank Fusion (RRF, $k=60$) and executes a 2nd-stage Semantic Cross-ReRanker evaluating exact entity metrics, term proximity window density, and direct cosine cross-similarity.
    - Enforces strict entitlement boundaries across both sparse and dense retrieval pipelines.
+
+8. **Multimodal Chart Extraction & Visual Ground Truth**:
+   - Uses PyMuPDF to extract high-resolution vector and raster charts directly from report pages.
+   - Employs Gemini Flash Lite vision model to convert visual graphics, donut slice distributions, and trajectory projections into structured, verifiable Markdown tables.
+   - Ingests visual ground-truth evidence chunks into ChromaDB and the sparse inverted index for direct retrieval and citation.
 
 ---
 
@@ -141,6 +146,7 @@ flowchart TD
 - **Database**: Shared MySQL 8.0 database (with SQLite fallback) for the FastAPI agent and CI3 portal
 - **Database roles**: Read-write credentials for application/portal writes; read-only credentials for agent SQL and health probes
 - **Vector & Lexical Search**: ChromaDB (Dense FastEmbed) + In-Memory TF-IDF + Reciprocal Rank Fusion (RRF)
+- **Vision & Multimodal**: PyMuPDF + Gemini Flash Lite (Visual Ground Truth)
 - **Observability**: Langfuse / LangSmith
 - **Containerization**: Docker Compose
 
