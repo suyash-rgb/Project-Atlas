@@ -72,6 +72,11 @@ services:
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
       LANGFUSE_HOST: ${LANGFUSE_HOST:-}
       HF_HOME: /app/data/.cache/huggingface
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      SEMANTIC_CACHE_ENABLED: ${SEMANTIC_CACHE_ENABLED:-true}
+      SEMANTIC_CACHE_THRESHOLD: ${SEMANTIC_CACHE_THRESHOLD:-0.90}
     volumes:
       - ./models:/app/models
       - ./data:/app/data
@@ -79,7 +84,21 @@ services:
       - atlas_network
 
   # -------------------------------------------------------------
-  # 3. CodeIgniter 3 Corporate Portal (Cognitive Market Research)
+  # 3. Redis Vector Engine for Semantic Caching
+  # -------------------------------------------------------------
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: atlas_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - atlas_network
+
+  # -------------------------------------------------------------
+  # 4. CodeIgniter 3 Corporate Portal (Cognitive Market Research)
   # -------------------------------------------------------------
   portal:
     build:
@@ -111,4 +130,6 @@ networks:
 
 volumes:
   mysql_data:
+    driver: local
+  redis_data:
     driver: local

@@ -35,6 +35,15 @@ class Settings(BaseSettings):
     LANGFUSE_SECRET_KEY: Optional[str] = None
     LANGFUSE_HOST: Optional[str] = None
 
+    # Redis Semantic Cache
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: Optional[str] = None
+    REDIS_DB: int = 0
+    SEMANTIC_CACHE_ENABLED: bool = True
+    SEMANTIC_CACHE_THRESHOLD: float = 0.90
+    SEMANTIC_CACHE_TTL_SECONDS: int = 86400
+
     model_config = SettingsConfigDict(
         env_file=str(REPOSITORY_ROOT / ".env"),
         env_file_encoding="utf-8",

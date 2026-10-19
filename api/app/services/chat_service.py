@@ -4,6 +4,7 @@ from typing import Callable, Optional
 from app.schemas.chat import ChatResponse
 from app.agent.graph import run_agent_workflow
 from app.core.telemetry import telemetry
+from app.core.semantic_cache import semantic_cache
 from app.core.observability import observe_with_tags
 
 logger = logging.getLogger("project_atlas.chat_service")
@@ -29,7 +30,7 @@ class ChatService:
     ) -> ChatResponse:
         """
         Executes the LangGraph agent state machine:
-        1. Checks in-memory semantic cache for repeated queries
+        1. Checks exact LRU cache and Redis vector semantic cache
         2. System-1 Laya 421M Guardrail routing
         3. Prompt injection & SQL attack interception
         4. Entitlement-scoped retrieval and SQL tool execution
@@ -46,8 +47,18 @@ class ChatService:
         cleaned_client = client_id.strip().upper()
         cleaned_question = question.strip()
 
-        # 1. Query Cache Check (Assignment Hard Part: repeated query cache)
+        # 1. Exact LRU Query Cache Check
         cached_response = telemetry.cache.get(cleaned_client, cleaned_question)
+
+        # 2. Redis Semantic Cache Check (Vector similarity >= threshold)
+        if cached_response is None:
+            semantic_data = semantic_cache.get(cleaned_client, cleaned_question)
+            if semantic_data is not None:
+                try:
+                    cached_response = ChatResponse(**semantic_data)
+                except Exception:
+                    cached_response = None
+
         if cached_response is not None:
             if token_callback is not None:
                 token_callback(cached_response.answer)
@@ -89,8 +100,9 @@ class ChatService:
             prompt_tokens = int(len(cleaned_question.split()) * 1.35) + 350
             completion_tokens = int(len(response.answer.split()) * 1.35)
 
-            # Store in query cache
+            # Store in query caches (Exact LRU + Redis Vector Semantic Cache)
             telemetry.cache.set(cleaned_client, cleaned_question, response)
+            semantic_cache.set(cleaned_client, cleaned_question, response)
 
             # Record telemetry (Structured log + Langfuse if active)
             telemetry.record_request(
