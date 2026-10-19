@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: Optional[str] = None
     GEMINI_MODEL: str = "gemini-3.5-flash-lite"
     CORS_ALLOWED_ORIGINS: list[str] = [
+        "*",
         "http://localhost:8080",
         "http://127.0.0.1:8080",
     ]
