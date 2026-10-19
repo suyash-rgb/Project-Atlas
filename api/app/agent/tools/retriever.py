@@ -22,14 +22,9 @@ from llama_index.core.vector_stores import MetadataFilters, MetadataFilter, Filt
 
 from app.core.config import REPOSITORY_ROOT, settings
 from app.core.observability import observe_with_tags
+from app.db.session import get_db_connection
 from app.agent.tools.hybrid import TFIDFIndex, reciprocal_rank_fusion
-from app.agent.tools.utils import (
-    DEFAULT_REPORT_METADATA,
-    fetch_report_metadata,
-    fetch_all_reports_metadata,
-    get_public_report_ids,
-    register_runtime_report,
-)
+from app.agent.tools.reranker import get_reranker
 
 CHROMA_PATH = str(getattr(settings, "CHROMA_DB_PATH", None) or (REPOSITORY_ROOT / "data" / "chroma_db"))
 REPORTS_DIR = str(getattr(settings, "REPORTS_DIR", None) or (REPOSITORY_ROOT / "data" / "reports"))
@@ -40,8 +35,78 @@ logger = logging.getLogger("project_atlas.retriever")
 Settings.embed_model = FastEmbedEmbedding(model_name="BAAI/bge-small-en-v1.5")
 Settings.node_parser = SentenceSplitter(chunk_size=512, chunk_overlap=64)
 
-# Dynamic accessor for backward-compatible metadata lookups
-REPORT_METADATA_REGISTRY = fetch_all_reports_metadata()
+_RUNTIME_REPORT_REGISTRY: Dict[str, Dict[str, Any]] = {}
+
+
+def register_runtime_report(report_id: str, metadata: Dict[str, Any]) -> None:
+    """Store dynamically ingested report metadata in memory."""
+    _RUNTIME_REPORT_REGISTRY[report_id] = metadata
+
+
+def fetch_report_metadata(report_id: str) -> Dict[str, Any]:
+    """Fetch authoritative report metadata directly from the database 'reports' table."""
+    if report_id in _RUNTIME_REPORT_REGISTRY:
+        return dict(_RUNTIME_REPORT_REGISTRY[report_id])
+
+    try:
+        conn = get_db_connection(readonly=True)
+        cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                "SELECT id, title, publisher, published, sector, access FROM reports WHERE id = %s",
+                (report_id,)
+            )
+            row = cursor.fetchone()
+            if row:
+                row_dict = dict(row) if isinstance(row, dict) else {
+                    "id": row[0], "title": row[1], "publisher": row[2],
+                    "published": row[3], "sector": row[4], "access": row[5]
+                }
+                pub_date = str(row_dict.get("published", ""))
+                year_val = int(pub_date[:4]) if len(pub_date) >= 4 and pub_date[:4].isdigit() else 2024
+                return {
+                    "title": str(row_dict.get("title") or report_id),
+                    "publisher": str(row_dict.get("publisher") or "Unknown"),
+                    "sector": str(row_dict.get("sector") or "General"),
+                    "published": pub_date,
+                    "year": year_val,
+                    "access": str(row_dict.get("access") or "paid"),
+                }
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as exc:
+        logger.warning("db_metadata_lookup_failed report_id=%s error=%s", report_id, exc)
+
+    return {
+        "title": report_id,
+        "publisher": "Unknown",
+        "sector": "General",
+        "published": "2024-01-01",
+        "year": 2024,
+        "access": "paid",
+    }
+
+
+def get_public_report_ids() -> List[str]:
+    """Retrieve public report IDs directly from the database 'reports' table."""
+    try:
+        conn = get_db_connection(readonly=True)
+        cursor = conn.cursor()
+        try:
+            cursor.execute("SELECT id FROM reports WHERE access LIKE %s", ("%public%",))
+            rows = cursor.fetchall()
+            return [
+                str(r.get("id") if isinstance(r, dict) else r[0])
+                for r in rows
+                if (r.get("id") if isinstance(r, dict) else r[0]) is not None
+            ]
+        finally:
+            cursor.close()
+            conn.close()
+    except Exception as exc:
+        logger.warning("db_public_reports_lookup_failed error=%s", exc)
+        return []
 
 
 class RetrievedChunk(BaseModel):
@@ -233,7 +298,6 @@ class EntitlementRetriever:
             "access": access_tier,
             "coverage": f"{sector} market coverage"
         })
-        REPORT_METADATA_REGISTRY[report_id] = fetch_report_metadata(report_id)
 
         if self._index is not None:
             for d in documents:
@@ -355,9 +419,8 @@ class EntitlementRetriever:
                 dense_id_fn=_chunk_key,
                 sparse_id_fn=_chunk_key,
             )
-            final_results: List[RetrievedChunk] = []
-            for item, rrf_score in fused[:top_k]:
-                final_results.append(RetrievedChunk(
+            candidates = [
+                RetrievedChunk(
                     report_id=item.report_id,
                     page=item.page,
                     text=item.text,
@@ -365,13 +428,19 @@ class EntitlementRetriever:
                     title=item.title,
                     sector=item.sector,
                     access=item.access,
-                ))
+                )
+                for item, rrf_score in fused[:candidate_k]
+            ]
         elif dense_chunks:
-            final_results = dense_chunks[:top_k]
+            candidates = dense_chunks[:candidate_k]
         elif sparse_chunks:
-            final_results = sparse_chunks[:top_k]
+            candidates = sparse_chunks[:candidate_k]
         else:
-            final_results = []
+            candidates = []
+
+        # 4. Semantic Re-Ranker Stage
+        reranker = get_reranker()
+        final_results = reranker.rerank(query=query, candidates=candidates, top_k=top_k)
 
         logger.info(
             "hybrid_retrieval_completed dense_count=%s sparse_count=%s fused_count=%s allowed_report_count=%s",
