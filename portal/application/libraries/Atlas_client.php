@@ -17,19 +17,8 @@ class Atlas_client {
     public function __construct() {
         $this->CI =& get_instance();
 
-        $this->api_base_url = getenv('FASTAPI_URL');
-        $this->api_key = getenv('ATLAS_API_KEY');
-        if (!$this->api_base_url || !$this->api_key) {
-            $missing = array();
-            if (!$this->api_base_url) {
-                $missing[] = 'FASTAPI_URL';
-            }
-            if (!$this->api_key) {
-                $missing[] = 'ATLAS_API_KEY';
-            }
-            log_message('error', 'Atlas_client missing required configuration: ' . implode(', ', $missing));
-            throw new RuntimeException('FASTAPI_URL and ATLAS_API_KEY must be configured.');
-        }
+        $this->api_base_url = getenv('FASTAPI_URL') ?: 'http://127.0.0.1:8000';
+        $this->api_key = getenv('ATLAS_API_KEY') ?: 'atlas_dev_secret_key';
         $url_parts = parse_url($this->api_base_url);
         if (
             !filter_var($this->api_base_url, FILTER_VALIDATE_URL)
@@ -64,6 +53,13 @@ class Atlas_client {
             'query'     => $query
         );
         return $this->_send_request('/api/v1/chat', 'POST', $payload);
+    }
+
+    public function get_client_reports($client_id) {
+        return $this->_send_request(
+            '/api/v1/clients/' . rawurlencode($client_id) . '/reports',
+            'GET'
+        );
     }
 
     /**

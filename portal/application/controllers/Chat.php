@@ -13,10 +13,10 @@ class Chat extends CI_Controller {
     public function __construct() {
         parent::__construct();
         $this->load->library('atlas_client');
+        $this->load->library('session');
         $this->load->helper(array('url', 'form', 'security'));
-        // Load database if DB_HOST is explicitly configured (e.g. inside Docker Compose)
         if (getenv('DB_HOST')) {
-            $this->load->database('', TRUE);
+            $this->load->database();
         }
     }
 
@@ -26,15 +26,7 @@ class Chat extends CI_Controller {
     public function index() {
         $data['title'] = 'Report Copilot | Cognitive Market Research';
         
-        // List of clients for the selector matching database seed
-        $data['clients'] = array(
-            'C-01' => 'Northwind Utilities (R-101, R-103)',
-            'C-02' => 'Blue Delta Infra (R-103 only)',
-            'C-03' => 'AquaTech Industrial Corp (R-104, R-106)',
-            'C-04' => 'City of Austin Water Utility (R-101 only)',
-            'C-05' => 'Global Grid Analytics (R-105)',
-            'C-06' => 'Public Visitor (Public Excerpts only)'
-        );
+        $data['client'] = $this->session->userdata('client_auth');
 
         $this->load->view('chat_view', $data);
     }
@@ -49,38 +41,43 @@ class Chat extends CI_Controller {
             return;
         }
 
+        $client = $this->authenticated_client();
+        if (!$client) {
+            return;
+        }
+
         $raw_input = file_get_contents('php://input');
         $input = json_decode($raw_input, true);
+        if (!is_array($input)) {
+            $input = $this->input->post();
+        }
 
-        $client_id = isset($input['client_id']) ? $this->security->xss_clean($input['client_id']) : 'C-01';
-        $query = isset($input['query']) ? trim($input['query']) : '';
+        $query = is_array($input) && isset($input['query']) && is_string($input['query'])
+            ? trim($input['query'])
+            : '';
 
         if (empty($query)) {
-            $this->output
-                ->set_content_type('application/json')
-                ->set_status_header(400)
-                ->set_output(json_encode(array(
-                    'status' => 'error',
-                    'message' => 'Query cannot be empty.'
-                )));
+            $this->json_error(400, 'Query cannot be empty.');
             return;
         }
 
         // Send query to Python FastAPI service via Atlas_client
-        $response = $this->atlas_client->send_chat($client_id, $query);
+        $response = $this->atlas_client->send_chat($client['id'], $query);
 
         // Persist conversation if database is active and response succeeded
         if (isset($this->db) && isset($this->db->conn_id) && $this->db->conn_id && isset($response['data'])) {
             $data_payload = $response['data'];
-            $this->db->insert('conversations', array(
-                'session_id' => session_id() ?: ('sess-' . time()),
-                'client_id'  => $client_id,
+            if (!$this->db->insert('conversations', array(
+                'session_id' => $this->session->userdata('conversation_session_id'),
+                'client_id'  => $client['id'],
                 'question'   => $query,
                 'answer'     => isset($data_payload['answer']) ? $data_payload['answer'] : '',
                 'confidence' => isset($data_payload['confidence']) ? (float)$data_payload['confidence'] : 1.0,
                 'escalated'  => !empty($data_payload['escalated']) ? 1 : 0,
                 'created_at' => date('Y-m-d H:i:s')
-            ));
+            ))) {
+                log_message('error', 'Failed to persist a completed chat conversation.');
+            }
         }
 
         $this->output
@@ -95,6 +92,11 @@ class Chat extends CI_Controller {
     public function stream() {
         if (!$this->input->is_ajax_request() && $this->input->method() !== 'post') {
             show_404();
+            return;
+        }
+
+        $client = $this->authenticated_client();
+        if (!$client) {
             return;
         }
 
@@ -113,25 +115,33 @@ class Chat extends CI_Controller {
             return;
         }
 
-        $client_id = isset($input['client_id']) && is_string($input['client_id'])
-            ? $this->security->xss_clean($input['client_id'])
-            : 'C-01';
         $query = isset($input['query']) && is_string($input['query'])
             ? trim($input['query'])
             : '';
 
         if ($query === '') {
-            $this->output
-                ->set_content_type('application/json')
-                ->set_status_header(400)
-                ->set_output(json_encode(array(
-                    'status' => 'error',
-                    'message' => 'Query cannot be empty.'
-                )));
+            $this->json_error(400, 'Query cannot be empty.');
             return;
         }
 
-        $this->atlas_client->stream_chat($client_id, $query);
+        $this->atlas_client->stream_chat($client['id'], $query);
+    }
+
+    public function reports() {
+        $client = $this->authenticated_client();
+        if (!$client) {
+            return;
+        }
+
+        $response = $this->atlas_client->get_client_reports($client['id']);
+        $this->output
+            ->set_content_type('application/json')
+            ->set_status_header($response['code'])
+            ->set_output(json_encode(
+                isset($response['data'])
+                    ? $response['data']
+                    : array('message' => $response['message'])
+            ));
     }
 
     /**
@@ -143,28 +153,39 @@ class Chat extends CI_Controller {
             return;
         }
 
+        $client = $this->authenticated_client();
+        if (!$client) {
+            return;
+        }
+
         $input = json_decode(file_get_contents('php://input'), true);
         if (!is_array($input)) {
             $input = $this->input->post();
         }
 
-        $client_id = isset($input['client_id']) ? $this->security->xss_clean($input['client_id']) : 'C-01';
         $question = isset($input['question']) ? $this->security->xss_clean($input['question']) : '';
         $answer = isset($input['answer']) ? $this->security->xss_clean($input['answer']) : '';
         $confidence = isset($input['confidence']) ? (float)$input['confidence'] : 1.0;
         $escalated = !empty($input['escalated']) ? 1 : 0;
-        $session_id = isset($input['session_id']) ? $this->security->xss_clean($input['session_id']) : (session_id() ?: ('sess-' . time()));
+        $session_id = $this->session->userdata('conversation_session_id');
 
-        if (isset($this->db) && isset($this->db->conn_id) && $this->db->conn_id && $question !== '') {
-            $this->db->insert('conversations', array(
-                'session_id' => $session_id,
-                'client_id'  => $client_id,
-                'question'   => $question,
-                'answer'     => $answer,
-                'confidence' => $confidence,
-                'escalated'  => $escalated,
-                'created_at' => date('Y-m-d H:i:s')
-            ));
+        if (!isset($this->db) || !isset($this->db->conn_id) || !$this->db->conn_id) {
+            $this->json_error(503, 'Conversation storage is unavailable.');
+            return;
+        }
+
+        if ($question === '' || !$this->db->insert('conversations', array(
+            'session_id' => $session_id,
+            'client_id'  => $client['id'],
+            'question'   => $question,
+            'answer'     => $answer,
+            'confidence' => $confidence,
+            'escalated'  => $escalated,
+            'created_at' => date('Y-m-d H:i:s')
+        ))) {
+            log_message('error', 'Failed to persist a completed chat conversation.');
+            $this->json_error(500, 'The conversation could not be saved.');
+            return;
         }
 
         $this->output
@@ -181,40 +202,45 @@ class Chat extends CI_Controller {
             return;
         }
 
+        $client = $this->authenticated_client();
+        if (!$client) {
+            return;
+        }
+
         $raw_input = file_get_contents('php://input');
         $input = json_decode($raw_input, true);
         if (!is_array($input)) {
             $input = $this->input->post();
         }
 
-        $client_id = isset($input['client_id']) ? $this->security->xss_clean($input['client_id']) : 'C-01';
         $message_id = isset($input['message_id']) ? $this->security->xss_clean($input['message_id']) : ('msg-' . time());
         $rating = isset($input['rating']) ? $this->security->xss_clean($input['rating']) : 'up';
         $query = isset($input['query']) ? $this->security->xss_clean($input['query']) : '';
         $comment = isset($input['comment']) ? $this->security->xss_clean($input['comment']) : '';
 
-        // If database connection is active, insert into feedback table
-        if (isset($this->db) && isset($this->db->conn_id) && $this->db->conn_id) {
-            $inserted = $this->db->insert('feedback', array(
-                'client_id'  => $client_id,
-                'message_id' => $message_id,
-                'rating'     => $rating,
-                'query'      => $query,
-                'comment'    => $comment,
-                'created_at' => date('Y-m-d H:i:s')
-            ));
+        if (!in_array($rating, array('up', 'down'), true) || $query === '') {
+            $this->json_error(400, 'Feedback rating and question are required.');
+            return;
+        }
 
-            if (!$inserted) {
-                log_message('error', 'Failed to insert feedback into MySQL.');
-                $this->output
-                    ->set_content_type('application/json')
-                    ->set_status_header(500)
-                    ->set_output(json_encode(array(
-                        'status'  => 'error',
-                        'message' => 'Failed to save feedback to database.'
-                    )));
-                return;
-            }
+        if (!isset($this->db) || !isset($this->db->conn_id) || !$this->db->conn_id) {
+            $this->json_error(503, 'Feedback storage is unavailable.');
+            return;
+        }
+
+        $inserted = $this->db->insert('feedback', array(
+            'client_id'  => $client['id'],
+            'message_id' => $message_id,
+            'rating'     => $rating,
+            'query'      => $query,
+            'comment'    => $comment,
+            'created_at' => date('Y-m-d H:i:s')
+        ));
+
+        if (!$inserted) {
+            log_message('error', 'Failed to insert feedback into MySQL.');
+            $this->json_error(500, 'Failed to save feedback.');
+            return;
         }
 
         $this->output
@@ -222,6 +248,31 @@ class Chat extends CI_Controller {
             ->set_output(json_encode(array(
                 'status'  => 'success',
                 'message' => 'Thank you for your feedback!'
+            )));
+    }
+
+    private function authenticated_client() {
+        $client = $this->session->userdata('client_auth');
+        if (
+            is_array($client)
+            && !empty($client['id'])
+            && !empty($client['company'])
+            && !empty($client['email'])
+        ) {
+            return $client;
+        }
+
+        $this->json_error(401, 'Please sign in to continue.');
+        return NULL;
+    }
+
+    private function json_error($status, $message) {
+        $this->output
+            ->set_content_type('application/json')
+            ->set_status_header($status)
+            ->set_output(json_encode(array(
+                'status' => 'error',
+                'message' => $message
             )));
     }
 }

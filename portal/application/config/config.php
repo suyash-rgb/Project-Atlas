@@ -22,7 +22,10 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 | If you need to allow multiple domains, remember that this file is still
 | a PHP script and you can easily do that on your own.
 |
-if (isset($_SERVER['HTTP_HOST'])) {
+$configured_base_url = getenv('APP_BASE_URL');
+if ($configured_base_url) {
+    $config['base_url'] = rtrim($configured_base_url, '/') . '/';
+} elseif (isset($_SERVER['HTTP_HOST'])) {
     $protocol = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? "https://" : "http://";
     $config['base_url'] = $protocol . $_SERVER['HTTP_HOST'] . '/';
 } else {
@@ -415,8 +418,8 @@ $config['sess_regenerate_destroy'] = FALSE;
 $config['cookie_prefix']	= '';
 $config['cookie_domain']	= '';
 $config['cookie_path']		= '/';
-$config['cookie_secure']	= FALSE;
-$config['cookie_httponly'] 	= FALSE;
+$config['cookie_secure']	= filter_var(getenv('SESSION_COOKIE_SECURE') ?: 'false', FILTER_VALIDATE_BOOLEAN);
+$config['cookie_httponly'] 	= TRUE;
 $config['cookie_samesite'] 	= 'Lax';
 
 /*
