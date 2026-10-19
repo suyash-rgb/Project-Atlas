@@ -1,13 +1,14 @@
 # Project Atlas — Report Copilot
 ### Cognitive Market Research & Consulting | Enterprise Agentic AI Intelligence Platform
 
-[![Docker Compose](https://img.shields.io/badge/Docker%20Compose-Ready%20(Linux%2FmacOS%2FWin)-blue?logo=docker)](file:///d:/MCA%20Sage%20Uni/Semester-3/Cognitive/Project%20Atlas/docker-compose.yml)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)](file:///d:/MCA%20Sage%20Uni/Semester-3/Cognitive/Project%20Atlas/api)
-[![LangGraph](https://img.shields.io/badge/LangGraph-Agentic%20State%20Machine-orange)](file:///d:/MCA%20Sage%20Uni/Semester-3/Cognitive/Project%20Atlas/api/app/agent/graph.py)
-[![CodeIgniter](https://img.shields.io/badge/CodeIgniter-3.1.13%20(PHP%208.1)-ee4326?logo=codeigniter)](file:///d:/MCA%20Sage%20Uni/Semester-3/Cognitive/Project%20Atlas/portal)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0%20InnoDB-4479A1?logo=mysql)](file:///d:/MCA%20Sage%20Uni/Semester-3/Cognitive/Project%20Atlas/docker/mysql)
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](file:///d:/MCA%20Sage%20Uni/Semester-3/Cognitive/Project%20Atlas/pyproject.toml)
-[![Tests](https://img.shields.io/badge/Pytest-170%20Passed%20(100%25)-brightgreen)](file:///d:/MCA%20Sage%20Uni/Semester-3/Cognitive/Project%20Atlas/api/tests)
+[![Docker Compose](https://img.shields.io/badge/Docker%20Compose-Ready%20(Linux%2FmacOS%2FWin)-blue?logo=docker)](docker-compose.yml)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)](api)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Agentic%20State%20Machine-orange)](api/app/agent/graph.py)
+[![CodeIgniter](https://img.shields.io/badge/CodeIgniter-3.1.13%20(PHP%208.1)-ee4326?logo=codeigniter)](portal)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0%20InnoDB-4479A1?logo=mysql)](docker/mysql)
+[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](pyproject.toml)
+[![Tests](https://img.shields.io/badge/Pytest-174%20Passed%20(100%25)-brightgreen)](api/tests)
+[![CI](https://github.com/suyash-rgb/Project-Atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/suyash-rgb/Project-Atlas/actions/workflows/ci.yml)
 
 Project Atlas is an enterprise-grade **Report Copilot** engineered for **Cognitive Market Research and Consulting**. It orchestrates an entitlement-aware multi-agent state machine that grounds queries against licensed PDF market research reports (R-101 to R-106), detects methodological conflicts across disparate reports, executes safe AST-parsed natural language SQL, computes deterministic compound projections (CAGR), and streams tokens in real time via an unbuffered Server-Sent Events (SSE) pipeline through a CodeIgniter 3 gateway.
 
@@ -175,13 +176,13 @@ You can **Sign Up** to create your own new account, or log in directly with any 
 
 ## 🔬 Running Automated Tests & Evaluation Suite
 
-### Run the 170+ Test Suite (Unit & Integration)
+### Run the 174-Test Suite (Unit, Security & Integration)
 Inside the running API container:
 ```bash
-docker compose exec api pytest -q
+docker compose exec api pytest -v
 ```
-*(Or locally: `pytest -q` from root)*
-*Result: **170 passed, 1 skipped** (100% green).*
+*(Or locally: `pytest -v api/tests/` from virtual environment)*
+*Result: **174 passed, 0 failed** (100% green).*
 
 ### Run the 26-Case End-to-End Evaluation Benchmark
 The project includes a comprehensive evaluation runner assessing Correctness, Citation Accuracy, Refusal Accuracy, and Conflict Detection:
