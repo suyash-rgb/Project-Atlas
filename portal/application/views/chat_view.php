@@ -38,7 +38,7 @@
             <a href="javascript:void(0)" class="nav-link active" id="navHome" onclick="navigateTo('home')">Home</a>
             <a href="javascript:void(0)" class="nav-link" id="navReports" onclick="navigateTo('home')">Market Reports</a>
             <a href="javascript:void(0)" class="nav-link" id="navCopilot" onclick="navigateTo('copilot')">Report Copilot (AI)</a>
-            <a href="javascript:void(0)" class="nav-link" id="navAthenaeum" onclick="navigateTo('home')">Athenaeum Access</a>
+            <a href="javascript:void(0)" class="nav-link" id="navAthenaeum" onclick="navigateTo('home')">Atlas Access</a>
 
             <!-- Corporate Client Account Profile & Switch Session -->
             <div id="authProfileContainer" class="user-profile-nav" style="display: none;">
@@ -121,67 +121,76 @@
     <div id="viewLanding" class="landing-view-container">
         <!-- Hero Section -->
         <section class="landing-hero">
-            <div class="landing-hero-tag">
-                <i class="fa-solid fa-compass"></i> Next-Gen Market Intelligence Platform
-            </div>
-            <h1>Cognitive Market Research<br><span>Report Copilot (Atlas)</span></h1>
-            <p>
-                Access verified strategic research, deterministic growth projections, and cross-report discrepancy reconciliation. Empower your executive team with private, entitled AI consulting.
-            </p>
-            <div class="landing-hero-actions">
-                <button class="btn-hero-primary" onclick="openAuthModal()">
-                    <i class="fa-solid fa-lock-open"></i> Client Sign In
-                </button>
-                <button class="btn-hero-secondary" onclick="switchAuthTab('signup'); openAuthModal();">
-                    <i class="fa-solid fa-user-plus"></i> Register Corporate Account
-                </button>
-            </div>
+            <div class="landing-hero-content-wrap">
+                <!-- Hero Left Column -->
+                <div class="landing-hero-left">
+                    <div class="landing-pills-row">
+                        <span class="landing-pill">Success of 10+ Years</span>
+                        <span class="landing-pill">End to End Market Research</span>
+                        <span class="landing-pill">Proprietary Data</span>
+                        <span class="landing-pill">Atlas AI Platform</span>
+                    </div>
+                    <h1>Uncover The Full Truth of<br>Market with Cognitive</h1>
+                    <p>
+                        End-to-end research solutions for global enterprises. Surveys, expert consultation, deep-dive analytics all in one place.
+                    </p>
+                    <div class="landing-hero-actions">
+                        <button class="btn-hero-primary" onclick="openAuthModal()">
+                            <i class="fa-solid fa-chart-line"></i> Atlas AI
+                        </button>
+                        <button class="btn-hero-secondary" onclick="openAuthModal()">
+                            <i class="fa-solid fa-headset"></i> Talk to an Expert
+                        </button>
+                    </div>
+                </div>
 
-            <!-- Stats Bar -->
-            <div class="landing-stats-grid">
-                <div class="landing-stat-item">
-                    <div class="landing-stat-value">6+</div>
-                    <div class="landing-stat-label">Enterprise Sectors</div>
-                </div>
-                <div class="landing-stat-item">
-                    <div class="landing-stat-value">&lt;35ms</div>
-                    <div class="landing-stat-label">Guardrail Verification</div>
-                </div>
-                <div class="landing-stat-item">
-                    <div class="landing-stat-value">100%</div>
-                    <div class="landing-stat-label">Formula Provenance</div>
-                </div>
-                <div class="landing-stat-item">
-                    <div class="landing-stat-value">Zero</div>
-                    <div class="landing-stat-label">Unauthorized Data Leakage</div>
+                <!-- Hero Right Column: Search Market Data Card -->
+                <div class="landing-search-card">
+                    <div class="landing-search-card-header">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <span>Search Market Data</span>
+                    </div>
+                    <div class="landing-search-subtitle">
+                        Access 50,000+ research reports across 30+ industries
+                    </div>
+                    <div class="landing-search-bar">
+                        <input type="text" id="landingSearchInput" placeholder="e.g. Coal market, EV battery...">
+                        <button onclick="openAuthModal()"><i class="fa-solid fa-magnifying-glass"></i></button>
+                    </div>
+                    <div class="landing-search-tags">
+                        <button class="landing-tag-btn" onclick="openAuthModal()"><i class="fa-solid fa-chart-simple"></i> Market Surveys</button>
+                        <button class="landing-tag-btn" onclick="openAuthModal()"><i class="fa-solid fa-brain"></i> Atlas AI</button>
+                        <button class="landing-tag-btn" onclick="openAuthModal()"><i class="fa-solid fa-users"></i> Consultation</button>
+                        <button class="landing-tag-btn" onclick="openAuthModal()"><i class="fa-solid fa-flask"></i> Methodology</button>
+                    </div>
                 </div>
             </div>
         </section>
 
-        <!-- Features Showcase -->
-        <section class="landing-features">
-            <div class="landing-features-header">
-                <h2>Precision Market Intelligence at Scale</h2>
-                <p>Built specifically for institutional investors, utilities, and industrial equipment manufacturers</p>
-            </div>
-            <div class="landing-cards-grid">
-                <div class="landing-card">
-                    <div class="landing-card-icon"><i class="fa-solid fa-code-compare"></i></div>
-                    <h3>Conflict & Discrepancy Reconciliation</h3>
-                    <p>Detect methodology differences across publishers (e.g. Turnkey vs Hardware-only scope) with full context transparency instead of arbitrary averaging.</p>
-                    <span class="landing-card-link" onclick="openAuthModal()">Explore Copilot <i class="fa-solid fa-arrow-right"></i></span>
+        <!-- Four Pillars of Our Research Ecosystem -->
+        <section class="landing-ecosystem-section">
+            <div class="landing-subheading-tag">The Full Truth Model</div>
+            <h2>Four Pillars of Our Research Ecosystem</h2>
+            <div class="pillars-grid">
+                <div class="pillar-card" onclick="openAuthModal()">
+                    <div class="pillar-icon-box"><i class="fa-solid fa-chart-simple"></i></div>
+                    <h3>Market Surveys</h3>
+                    <p>CATI, CAVI, CAPI, in-depth interviews and online panels delivering primary data at scale.</p>
                 </div>
-                <div class="landing-card">
-                    <div class="landing-card-icon"><i class="fa-solid fa-calculator"></i></div>
-                    <h3>Deterministic CAGR Projections</h3>
-                    <p>Derive unstated future valuations using mathematically verified compounding formulas, explicit base-year caveats, and zero floating-point hallucination.</p>
-                    <span class="landing-card-link" onclick="openAuthModal()">Access Tools <i class="fa-solid fa-arrow-right"></i></span>
+                <div class="pillar-card" onclick="openAuthModal()">
+                    <div class="pillar-icon-box"><i class="fa-solid fa-users-gear"></i></div>
+                    <h3>Expert Consultation</h3>
+                    <p>Direct access to 10,000+ validated industry experts across 30+ verticals worldwide.</p>
                 </div>
-                <div class="landing-card">
-                    <div class="landing-card-icon"><i class="fa-solid fa-shield-halved"></i></div>
-                    <h3>Strict Entitlement Enforcement</h3>
-                    <p>Rigorous role-based metadata access control ensures corporate clients only ever access the specific market volumes and reports they have purchased.</p>
-                    <span class="landing-card-link" onclick="openAuthModal()">Client Portal <i class="fa-solid fa-arrow-right"></i></span>
+                <div class="pillar-card" onclick="openAuthModal()">
+                    <div class="pillar-icon-box"><i class="fa-solid fa-newspaper"></i></div>
+                    <h3>Market Analysis</h3>
+                    <p>Syndicated and custom reports with granular data, forecasts, and competitive intelligence.</p>
+                </div>
+                <div class="pillar-card" onclick="openAuthModal()">
+                    <div class="pillar-icon-box"><i class="fa-solid fa-brain"></i></div>
+                    <h3>Atlas AI</h3>
+                    <p>AI-powered insights platform (PaaS) with real-time intelligence and interactive dashboards.</p>
                 </div>
             </div>
         </section>
