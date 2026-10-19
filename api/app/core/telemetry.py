@@ -17,6 +17,7 @@ from datetime import datetime, timezone
 from dataclasses import dataclass, field
 
 from app.core.config import settings
+from app.core.observability import trace_observation
 
 logger = logging.getLogger("project_atlas.telemetry")
 
@@ -85,9 +86,9 @@ class QueryResponseCache:
 
 class LangfuseBridge:
     """
-    Opt-in, non-blocking bridge to Langfuse Cloud.
+    Langfuse client status and lifecycle management. Traces are emitted by the
+    shared Langfuse decorators and observation helpers.
     Requires 0 MB local disk storage and 0 local Docker containers.
-    Fails safely without raising if credentials are unset or rate-limited.
     """
 
     def __init__(self):
@@ -108,10 +109,10 @@ class LangfuseBridge:
                     "secret_key": sec_key,
                 }
                 if host:
-                    client_options["host"] = host
+                    client_options["base_url"] = host
                 self._client = Langfuse(**client_options)
                 self.enabled = True
-                logger.info("Langfuse Cloud observability bridge initialized successfully.")
+                logger.info("Langfuse observability initialized successfully.")
             except Exception as e:
                 logger.exception(
                     "langfuse_initialization_failed error_type=%s fallback=local_logging",
@@ -121,59 +122,13 @@ class LangfuseBridge:
         else:
             logger.info("Langfuse keys not configured. Operating in zero-cost structured logging mode.")
 
-    def log_trace(
-        self,
-        trace_id: str,
-        client_id: str,
-        question: str,
-        answer: str,
-        intent: str,
-        latency_ms: float,
-        prompt_tokens: int,
-        completion_tokens: int,
-        cost_usd: float
-    ):
+    def flush(self):
         if not self.enabled or not self._client:
             return
-
         try:
-            root = self._client.start_observation(
-                name="report_copilot_query",
-                as_type="agent",
-                input=question,
-                metadata={
-                    "trace_id": trace_id,
-                    "client_id": client_id,
-                    "intent": intent,
-                    "latency_ms": latency_ms,
-                    "cost_usd": cost_usd
-                }
-            )
-            gen = root.start_observation(
-                name="llm_synthesizer",
-                as_type="generation",
-                input=question,
-                model="openai/gpt-oss-20b",
-                usage_details={
-                    "input": prompt_tokens,
-                    "output": completion_tokens,
-                    "total": prompt_tokens + completion_tokens
-                },
-                cost_details={
-                    "total": cost_usd
-                }
-            )
-            gen.update(output=answer[:1000] if answer else "")
-            gen.end()
-
-            root.update(output=answer[:1000] if answer else "")
-            root.end()
             self._client.flush()
         except Exception as e:
-            logger.warning(
-                "langfuse_trace_failed error_type=%s",
-                type(e).__name__,
-            )
+            logger.warning("langfuse_flush_failed error_type=%s", type(e).__name__)
 
 
 class TelemetryManager:
@@ -242,19 +197,21 @@ class TelemetryManager:
             record.escalated,
         )
 
-        # Send to Langfuse Cloud if enabled
-        if not cache_hit:
-            self.langfuse.log_trace(
-                trace_id=trace_id,
-                client_id=client_id,
-                question=question,
-                answer=answer,
-                intent=intent,
-                latency_ms=latency_ms,
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                cost_usd=cost
-            )
+        with trace_observation(
+            name="request_metrics",
+            metadata={
+                "intent": record.intent,
+                "latency_ms": record.latency_ms,
+                "prompt_tokens_estimated": record.prompt_tokens,
+                "completion_tokens_estimated": record.completion_tokens,
+                "total_tokens_estimated": record.total_tokens,
+                "estimated_cost_usd": record.estimated_cost_usd,
+                "cache_hit": record.cache_hit,
+                "escalated": record.escalated,
+                "token_count_source": "word_count_estimate",
+            },
+        ):
+            pass
 
         return record
 

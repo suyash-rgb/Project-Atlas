@@ -13,7 +13,7 @@ import groq
 from app.schemas.chat import ChatResponse, ConflictItem, DerivedValueItem
 from app.agent.tools.retriever import RetrievedChunk
 from app.core.config import settings
-from app.core.observability import observe_with_tags
+from app.core.observability import observe_with_tags, trace_observation
 
 BASE_SYSTEM_CORE = """You are the Senior Research Intelligence Copilot for Cognitive Market Research (Project Atlas).
 You provide clear, authoritative, executive market summaries to enterprise clients.
@@ -191,7 +191,7 @@ class LLMSynthesizer:
 
     @observe_with_tags(
         name="llm_synthesizer",
-        as_type="generation",
+        as_type="span",
         tags=["tool:synthesizer", "llm:generation"],
     )
     def synthesize(
@@ -254,42 +254,80 @@ class LLMSynthesizer:
         active_system_prompt = build_system_prompt(intent)
 
         answer_parts: List[str] = []
+        usage_details = None
         try:
-            if token_callback is None:
-                completion = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": active_system_prompt},
-                        {"role": "user", "content": user_content}
-                    ],
-                    temperature=0.1,
-                    max_tokens=1024,
-                    stream=False,
-                )
-                content = completion.choices[0].message.content
-                answer_text = (content or "").strip()
-            else:
-                stream_resp = self.client.chat.completions.create(
-                    model=self.model,
-                    messages=[
-                        {"role": "system", "content": active_system_prompt},
-                        {"role": "user", "content": user_content}
-                    ],
-                    temperature=0.1,
-                    max_tokens=1024,
-                    stream=True,
-                )
-                for chunk in stream_resp:
-                    token = chunk.choices[0].delta.content
-                    if token:
-                        answer_parts.append(token)
-                answer_text = "".join(answer_parts).strip()
-            answer_text = _normalize_text(answer_text)
+            with trace_observation(
+                name="groq_chat_completion",
+                as_type="generation",
+                metadata={"provider": "groq", "intent": intent},
+            ) as generation:
+                if token_callback is None:
+                    completion = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {"role": "system", "content": active_system_prompt},
+                            {"role": "user", "content": user_content}
+                        ],
+                        temperature=0.1,
+                        max_tokens=1024,
+                        stream=False,
+                    )
+                    usage_details = _extract_usage_details(
+                        getattr(completion, "usage", None)
+                    )
+                    content = completion.choices[0].message.content
+                    answer_text = (content or "").strip()
+                else:
+                    stream_resp = self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {"role": "system", "content": active_system_prompt},
+                            {"role": "user", "content": user_content}
+                        ],
+                        temperature=0.1,
+                        max_tokens=1024,
+                        stream=True,
+                    )
+                    for chunk in stream_resp:
+                        chunk_usage = _extract_usage_details(
+                            getattr(chunk, "usage", None)
+                        )
+                        if chunk_usage is not None:
+                            usage_details = chunk_usage
+                        if chunk.choices:
+                            token = chunk.choices[0].delta.content
+                            if token:
+                                answer_parts.append(token)
+                    answer_text = "".join(answer_parts).strip()
+                answer_text = _normalize_text(answer_text)
+                if generation is not None:
+                    generation_update = {
+                        "model": self.model,
+                        "metadata": {
+                            "provider": "groq",
+                            "usage_source": "groq_api" if usage_details else "unavailable",
+                        },
+                    }
+                    if usage_details is not None:
+                        generation_update["usage_details"] = usage_details
+                    generation.update(**generation_update)
         except Exception as e:
             logger.exception("synthesis_failed model=%s error_type=%s", self.model, type(e).__name__)
             raise RuntimeError("LLM synthesis failed.") from e
 
-        citations = validate_answer_citations(answer_text, retrieved_chunks)
+        with trace_observation(
+            name="citation_validation",
+            as_type="evaluator",
+            metadata={"validator": "retrieved_report_citations"},
+        ) as citation_observation:
+            citations = validate_answer_citations(answer_text, retrieved_chunks)
+            if citation_observation is not None:
+                citation_observation.update(
+                    metadata={
+                        "citation_count": len(citations),
+                        "validation": "passed",
+                    }
+                )
 
         if token_callback is not None:
             for token in answer_parts:
@@ -303,6 +341,25 @@ class LLMSynthesizer:
             derived_values=derived_values or [],
             escalated=False
         )
+
+
+def _extract_usage_details(usage: Any) -> Optional[Dict[str, int]]:
+    if usage is None:
+        return None
+
+    input_tokens = getattr(usage, "prompt_tokens", None)
+    output_tokens = getattr(usage, "completion_tokens", None)
+    if not isinstance(input_tokens, int) or not isinstance(output_tokens, int):
+        return None
+
+    total_tokens = getattr(usage, "total_tokens", None)
+    if not isinstance(total_tokens, int):
+        total_tokens = input_tokens + output_tokens
+    return {
+        "input": input_tokens,
+        "output": output_tokens,
+        "total": total_tokens,
+    }
 
 
 _synthesizer_instance = None

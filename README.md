@@ -132,7 +132,8 @@ flowchart TD
    - Automatically escalates queries to human analysts via MySQL support tickets if model confidence falls below threshold.
 
 6. **Observability & Monitoring**:
-   - End-to-end tracing, token usage, latency tracking, and request cost auditing via Langfuse / LangSmith.
+   - Langfuse traces chat requests through cache lookup, entitlement checks, routing, workflow nodes, Groq generation, citation validation, and request telemetry. Groq-reported token usage is recorded when available; local request-cost figures remain estimates.
+   - Prompt and answer content are not captured by the trace instrumentation. Client identifiers and retrieved report text are also excluded; trace metadata is limited to operational outcomes and counts.
 
 7. **Hybrid Retrieval & Semantic Re-Ranker (Sparse TF-IDF + Dense Vector + RRF + Cross-ReRanker)**:
    - Combines sub-millisecond sparse lexical retrieval (TF-IDF inverted index) with dense semantic embeddings (`BAAI/bge-small-en-v1.5` in ChromaDB).
@@ -203,6 +204,11 @@ not automatically use a MySQL server installed on Windows.
    service. The example uses `3307` to avoid colliding with an existing local
    MySQL server listening on `3306`. Container-to-container traffic continues
    to use the internal MySQL port `3306`.
+
+   Langfuse tracing is optional. To enable it, set `LANGFUSE_PUBLIC_KEY`,
+   `LANGFUSE_SECRET_KEY`, and (if self-hosted) `LANGFUSE_HOST` in `.env`.
+   Traces include workflow and operational metadata but omit user prompts,
+   answers, client identifiers, and retrieved report text.
 
 3. Validate Compose configuration and start the full stack:
 

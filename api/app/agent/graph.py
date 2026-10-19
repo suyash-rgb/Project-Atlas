@@ -27,6 +27,7 @@ from app.agent.tools.retriever import get_retriever, RetrievedChunk
 from app.agent.tools.calculator import calculate_projection, extract_numbers_from_query
 from app.agent.reconcile import detect_report_conflicts
 from app.agent.synthesizer import AnswerGroundingError, get_synthesizer
+from app.core.observability import observe_with_tags, trace_observation
 
 logger = logging.getLogger("project_atlas.agent.graph")
 
@@ -59,11 +60,29 @@ def log_escalation_to_db(client_id: str, question: str, reason: str) -> str:
 
 # --- Workflow Nodes ---
 
+@observe_with_tags(
+    name="guardrail_router_node",
+    as_type="guardrail",
+    tags=["workflow:router", "security:guardrail"],
+)
 def guardrail_router_node(state: AgentState) -> Dict[str, Any]:
     """
     Node 1: Evaluates user query with the fine-tuned Laya 421M model.
     """
-    decision: RouterDecision = classify_query(state["question"])
+    with trace_observation(
+        name="router_classification",
+        as_type="guardrail",
+    ) as observation:
+        decision: RouterDecision = classify_query(state["question"])
+        if observation is not None:
+            observation.update(
+                metadata={
+                    "intent": decision.intent,
+                    "confidence": decision.confidence,
+                    "is_attack": decision.is_attack,
+                    "requires_escalation": decision.requires_escalation,
+                }
+            )
     return {
         "intent": decision.intent,
         "router_confidence": decision.confidence,
@@ -72,6 +91,11 @@ def guardrail_router_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
+@observe_with_tags(
+    name="security_audit_node",
+    as_type="guardrail",
+    tags=["workflow:security-audit", "security:guardrail"],
+)
 def security_audit_node(state: AgentState) -> Dict[str, Any]:
     """
     Security Node: Triggered on prompt injection or SQL attack.
@@ -105,6 +129,11 @@ def security_audit_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
+@observe_with_tags(
+    name="uncertainty_escalation_node",
+    as_type="agent",
+    tags=["workflow:escalation"],
+)
 def uncertainty_escalation_node(state: AgentState) -> Dict[str, Any]:
     """Create a human-review ticket when the intent router is uncertain."""
     confidence = state.get("router_confidence", 0.0)
@@ -133,6 +162,11 @@ def uncertainty_escalation_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
+@observe_with_tags(
+    name="sql_execution_node",
+    as_type="tool",
+    tags=["workflow:sql", "data-access:read-only"],
+)
 def sql_execution_node(state: AgentState) -> Dict[str, Any]:
     """
     Node 2A: Handles database aggregates, counts, catalog summaries.
@@ -163,6 +197,11 @@ def sql_execution_node(state: AgentState) -> Dict[str, Any]:
     return {"sql_data": sql_results}
 
 
+@observe_with_tags(
+    name="calculation_node",
+    as_type="tool",
+    tags=["workflow:calculation", "calculation:deterministic"],
+)
 def calculation_node(state: AgentState) -> Dict[str, Any]:
     """
     Node 2B: Deterministic calculation of CAGR and forward projections.
@@ -240,6 +279,11 @@ def calculation_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
+@observe_with_tags(
+    name="retrieval_node",
+    as_type="retriever",
+    tags=["workflow:retrieval", "retrieval:entitlement-filtered"],
+)
 def retrieval_node(state: AgentState) -> Dict[str, Any]:
     """
     Node 2C: Entitlement-filtered vector search over ingested PDF reports.
@@ -277,6 +321,11 @@ def retrieval_node(state: AgentState) -> Dict[str, Any]:
     }
 
 
+@observe_with_tags(
+    name="out_of_scope_node",
+    as_type="guardrail",
+    tags=["workflow:out-of-scope"],
+)
 def out_of_scope_node(state: AgentState) -> Dict[str, Any]:
     """
     Node 2D: Handles general or unrelated queries.
@@ -298,6 +347,11 @@ def out_of_scope_node(state: AgentState) -> Dict[str, Any]:
     return {"final_response": response}
 
 
+@observe_with_tags(
+    name="synthesizer_node",
+    as_type="chain",
+    tags=["workflow:synthesis"],
+)
 def synthesizer_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any]:
     """
     Node 3: Synthesizes final response via Groq LLM with citations and verified figures.
@@ -423,6 +477,11 @@ def get_agent_graph():
     return _compiled_graph
 
 
+@observe_with_tags(
+    name="agent_workflow",
+    as_type="agent",
+    tags=["project-atlas", "workflow:agent-graph"],
+)
 def run_agent_workflow(
     client_id: str,
     question: str,
@@ -432,7 +491,16 @@ def run_agent_workflow(
     Public invocation interface:
     Resolves client entitlements, executes graph, returns typed ChatResponse.
     """
-    purchased = get_client_entitlements(client_id)
+    with trace_observation(
+        name="entitlement_lookup",
+        as_type="span",
+        metadata={"client_id_included": False},
+    ) as entitlement_observation:
+        purchased = get_client_entitlements(client_id)
+        if entitlement_observation is not None:
+            entitlement_observation.update(
+                metadata={"entitled_report_count": len(purchased)}
+            )
     graph = get_agent_graph()
 
     initial_state: AgentState = {
@@ -458,5 +526,10 @@ def run_agent_workflow(
         if token_callback is not None
         else None
     )
-    final_state = graph.invoke(initial_state, config=graph_config)
+    with trace_observation(
+        name="langgraph_execution",
+        as_type="chain",
+        metadata={"intent_routing_enabled": True},
+    ):
+        final_state = graph.invoke(initial_state, config=graph_config)
     return final_state["final_response"]

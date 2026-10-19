@@ -5,7 +5,7 @@ from app.schemas.chat import ChatResponse
 from app.agent.graph import run_agent_workflow
 from app.core.telemetry import telemetry
 from app.core.semantic_cache import semantic_cache
-from app.core.observability import observe_with_tags
+from app.core.observability import observe_with_tags, trace_observation
 
 logger = logging.getLogger("project_atlas.chat_service")
 
@@ -47,17 +47,31 @@ class ChatService:
         cleaned_client = client_id.strip().upper()
         cleaned_question = question.strip()
 
-        # 1. Exact LRU Query Cache Check
-        cached_response = telemetry.cache.get(cleaned_client, cleaned_question)
+        with trace_observation(
+            name="chat_cache_lookup",
+            metadata={"cache_layers": ["exact_lru", "semantic"]},
+        ) as cache_observation:
+            cache_layer = "miss"
+            cached_response = telemetry.cache.get(cleaned_client, cleaned_question)
 
-        # 2. Redis Semantic Cache Check (Vector similarity >= threshold)
-        if cached_response is None:
-            semantic_data = semantic_cache.get(cleaned_client, cleaned_question)
-            if semantic_data is not None:
-                try:
-                    cached_response = ChatResponse(**semantic_data)
-                except Exception:
-                    cached_response = None
+            if cached_response is not None:
+                cache_layer = "exact_lru"
+            else:
+                semantic_data = semantic_cache.get(cleaned_client, cleaned_question)
+                if semantic_data is not None:
+                    try:
+                        cached_response = ChatResponse(**semantic_data)
+                        cache_layer = "semantic"
+                    except Exception:
+                        cached_response = None
+
+            if cache_observation is not None:
+                cache_observation.update(
+                    metadata={
+                        "cache_hit": cached_response is not None,
+                        "cache_layer": cache_layer,
+                    }
+                )
 
         if cached_response is not None:
             if token_callback is not None:

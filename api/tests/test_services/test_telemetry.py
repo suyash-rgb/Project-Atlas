@@ -66,15 +66,3 @@ class TestTelemetry:
              }):
             bridge = LangfuseBridge()
         assert bridge.enabled is False
-        # Calling log_trace without credentials should not raise
-        bridge.log_trace(
-            trace_id="tr_test",
-            client_id="C-01",
-            question="test",
-            answer="test",
-            intent="factual_lookup",
-            latency_ms=50.0,
-            prompt_tokens=100,
-            completion_tokens=50,
-            cost_usd=0.00001
-        )

@@ -1,5 +1,6 @@
 import logging
 import time
+from contextlib import asynccontextmanager
 from uuid import uuid4
 
 from pathlib import Path
@@ -10,9 +11,19 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
+from app.core.telemetry import telemetry
 from app.api.v1.api import api_router as api_v1_router
 
 logger = logging.getLogger("project_atlas.http")
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    try:
+        yield
+    finally:
+        telemetry.langfuse.flush()
+
 
 def configure_logging() -> None:
     level = getattr(logging, settings.LOG_LEVEL.upper(), None)
@@ -81,6 +92,7 @@ def create_application() -> FastAPI:
                     "Features LangGraph multi-node state machine, Laya 421M System-1 guardrails, "
                     "deterministic CAGR calculators, AST-safe SQL tools, and entitlement RAG.",
         version=settings.VERSION,
+        lifespan=lifespan,
         openapi_url="/openapi.json",
         docs_url="/docs",
         redoc_url="/redoc",

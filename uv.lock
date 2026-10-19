@@ -4141,7 +4141,7 @@ requires-dist = [
     { name = "langchain-core", specifier = ">=0.2.0" },
     { name = "langchain-google-genai", specifier = ">=1.0.0" },
     { name = "langchain-openai", specifier = ">=0.1.0" },
-    { name = "langfuse", specifier = ">=2.38.0" },
+    { name = "langfuse", specifier = ">=3.0.0" },
     { name = "langgraph", specifier = ">=0.2.0" },
     { name = "laya", specifier = ">=0.1.6" },
     { name = "llama-index-core", specifier = ">=0.14.25" },
