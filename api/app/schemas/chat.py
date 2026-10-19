@@ -6,8 +6,16 @@ from datetime import datetime, timezone
 # --- Request Schemas ---
 
 class ChatRequest(BaseModel):
-    client_id: str = Field(..., description="Unique client identifier, e.g., C-01, C-02")
-    question: str = Field(..., description="Natural language question or prompt")
+    client_id: str = Field(
+        ...,
+        max_length=64,
+        description="Unique client identifier, e.g., C-01, C-02",
+    )
+    question: str = Field(
+        ...,
+        max_length=4000,
+        description="Natural language question or prompt",
+    )
 
     @model_validator(mode="before")
     @classmethod

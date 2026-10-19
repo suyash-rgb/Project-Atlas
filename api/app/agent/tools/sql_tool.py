@@ -1,6 +1,5 @@
 """AST-validated, entitlement-aware SQL access through MySQL's read-only role."""
 
-import concurrent.futures
 import logging
 import time
 from typing import List, Dict, Any, Optional
@@ -120,23 +119,39 @@ def execute_safe_sql(
     dialect = "sqlite" if getattr(settings, "DB_TYPE", "sqlite").lower() == "sqlite" else "mysql"
     sanitized_sql = expression.sql(dialect)
     started_at = time.perf_counter()
+    deadline = time.monotonic() + timeout_seconds
+    sqlite_timeout_enabled = False
     try:
-        try:
-            cursor.execute(f"SET SESSION max_execution_time = {int(timeout_seconds * 1000)}")
-        except Exception:
-            pass
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            future = executor.submit(cursor.execute, sanitized_sql)
+        if dialect == "mysql":
             try:
-                future.result(timeout=timeout_seconds)
-            except concurrent.futures.TimeoutError:
-                raise TimeoutError(f"SQL query execution exceeded timeout of {timeout_seconds}s.")
-
-        if hasattr(cursor, "fetchmany"):
-            rows = cursor.fetchmany(MAX_QUERY_ROWS)
+                cursor.execute(f"SET SESSION max_execution_time = {int(timeout_seconds * 1000)}")
+            except Exception as exc:
+                logger.exception("read_only_query_timeout_setup_failed engine=mysql")
+                raise RuntimeError("Could not configure the MySQL query timeout.") from exc
         else:
-            rows = cursor.fetchall()[:MAX_QUERY_ROWS]
+            conn.set_progress_handler(
+                lambda: int(time.monotonic() >= deadline),
+                1000,
+            )
+            sqlite_timeout_enabled = True
+
+        try:
+            cursor.execute(sanitized_sql)
+            if hasattr(cursor, "fetchmany"):
+                rows = cursor.fetchmany(MAX_QUERY_ROWS)
+            else:
+                rows = cursor.fetchall()[:MAX_QUERY_ROWS]
+        except Exception as exc:
+            if dialect == "sqlite" and time.monotonic() >= deadline:
+                raise TimeoutError(
+                    f"SQL query execution exceeded timeout of {timeout_seconds}s."
+                ) from exc
+            raise
+
+        if dialect == "sqlite" and time.monotonic() >= deadline:
+            raise TimeoutError(
+                f"SQL query execution exceeded timeout of {timeout_seconds}s."
+            )
         results = [dict(row) for row in rows]
     except Exception as exc:
         logger.exception(
@@ -146,6 +161,8 @@ def execute_safe_sql(
         )
         raise
     finally:
+        if sqlite_timeout_enabled:
+            conn.set_progress_handler(None, 0)
         cursor.close()
         conn.close()
 

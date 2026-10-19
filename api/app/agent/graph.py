@@ -26,7 +26,7 @@ from app.agent.tools.sql_tool import (
 from app.agent.tools.retriever import get_retriever, RetrievedChunk
 from app.agent.tools.calculator import calculate_projection, extract_numbers_from_query
 from app.agent.reconcile import detect_report_conflicts
-from app.agent.synthesizer import get_synthesizer
+from app.agent.synthesizer import AnswerGroundingError, get_synthesizer
 
 logger = logging.getLogger("project_atlas.agent.graph")
 
@@ -39,6 +39,7 @@ class AgentState(TypedDict):
     intent: str
     router_confidence: float
     is_attack: bool
+    requires_escalation: bool
     escalated: bool
     escalation_reason: Optional[str]
     escalation_ticket_id: Optional[str]
@@ -66,7 +67,8 @@ def guardrail_router_node(state: AgentState) -> Dict[str, Any]:
     return {
         "intent": decision.intent,
         "router_confidence": decision.confidence,
-        "is_attack": decision.is_attack
+        "is_attack": decision.is_attack,
+        "requires_escalation": decision.requires_escalation,
     }
 
 
@@ -100,6 +102,34 @@ def security_audit_node(state: AgentState) -> Dict[str, Any]:
         "escalation_reason": reason,
         "escalation_ticket_id": ticket_id,
         "final_response": response
+    }
+
+
+def uncertainty_escalation_node(state: AgentState) -> Dict[str, Any]:
+    """Create a human-review ticket when the intent router is uncertain."""
+    confidence = state.get("router_confidence", 0.0)
+    reason = f"Low intent-classification confidence: {confidence:.2f}"
+    ticket_id = log_escalation_to_db(state["client_id"], state["question"], reason)
+    response = ChatResponse(
+        answer="I'm not confident enough to answer safely. An analyst will review your question and follow up.",
+        citations=[],
+        confidence=confidence,
+        conflicts=[],
+        derived_values=[],
+        escalated=True,
+        escalation_ticket_id=ticket_id,
+    )
+    logger.info(
+        "low_confidence_escalated client_id=%s confidence=%.3f ticket_id=%s",
+        state["client_id"],
+        confidence,
+        ticket_id,
+    )
+    return {
+        "escalated": True,
+        "escalation_reason": reason,
+        "escalation_ticket_id": ticket_id,
+        "final_response": response,
     }
 
 
@@ -139,12 +169,62 @@ def calculation_node(state: AgentState) -> Dict[str, Any]:
     """
     q = state["question"]
     numbers = extract_numbers_from_query(q)
-    
+
+    if (
+        ("base_value_billion" not in numbers or "cagr_pct" not in numbers)
+        and "R-101" not in state["purchased_reports"]
+    ):
+        response = ChatResponse(
+            answer=(
+                "This projection requires figures from Report R-101, which is not included "
+                "in your current subscription. Please contact your account representative "
+                "to request access."
+            ),
+            citations=[],
+            confidence=1.0,
+            conflicts=[],
+            derived_values=[],
+            escalated=False,
+        )
+        logger.info(
+            "calculation_blocked_unentitled_baseline client_id=%s report_id=R-101",
+            state["client_id"],
+        )
+        return {"final_response": response}
+
     # Defaults based on primary Smart Water Meter market (R-101 baseline)
     base_val = numbers.get("base_value_billion", 4.21)
     base_yr = 2024
     target_yr = int(numbers.get("target_year", 2030))
     cagr_pct = numbers.get("cagr_pct", 11.2) / 100.0
+
+    if target_yr > 2030:
+        reason = f"Requested projection year {target_yr} is beyond the available forecast window ending in 2030."
+        ticket_id = log_escalation_to_db(state["client_id"], q, reason)
+        response = ChatResponse(
+            answer=(
+                "The available forecast ends in 2030, so I can't safely extend it to "
+                f"{target_yr}. An analyst will review whether a longer-range estimate is appropriate."
+            ),
+            citations=[],
+            confidence=0.0,
+            conflicts=[],
+            derived_values=[],
+            escalated=True,
+            escalation_ticket_id=ticket_id,
+        )
+        logger.info(
+            "calculation_escalated_beyond_forecast_window client_id=%s target_year=%s ticket_id=%s",
+            state["client_id"],
+            target_yr,
+            ticket_id,
+        )
+        return {
+            "escalated": True,
+            "escalation_reason": reason,
+            "escalation_ticket_id": ticket_id,
+            "final_response": response,
+        }
 
     derived_item = calculate_projection(
         metric_name="Projected Smart Water Meter Market Size",
@@ -210,14 +290,39 @@ def synthesizer_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any
 
     synthesizer = get_synthesizer()
     token_callback = config.get("configurable", {}).get("token_callback")
-    response = synthesizer.synthesize(
-        query=state["question"],
-        retrieved_chunks=state.get("retrieved_chunks", []),
-        sql_data=state.get("sql_data", []),
-        conflicts=state.get("conflicts", []),
-        derived_values=state.get("derived_values", []),
-        token_callback=token_callback,
-    )
+    try:
+        response = synthesizer.synthesize(
+            query=state["question"],
+            retrieved_chunks=state.get("retrieved_chunks", []),
+            sql_data=state.get("sql_data", []),
+            conflicts=state.get("conflicts", []),
+            derived_values=state.get("derived_values", []),
+            token_callback=token_callback,
+        )
+    except AnswerGroundingError as exc:
+        reason = "The generated answer could not be verified against cited report pages."
+        ticket_id = log_escalation_to_db(state["client_id"], state["question"], reason)
+        logger.warning(
+            "answer_grounding_failed client_id=%s error=%s ticket_id=%s",
+            state["client_id"],
+            str(exc),
+            ticket_id,
+        )
+        response = ChatResponse(
+            answer="I couldn't verify the answer's citations against the available reports. An analyst will review your question.",
+            citations=[],
+            confidence=0.0,
+            conflicts=state.get("conflicts", []),
+            derived_values=[],
+            escalated=True,
+            escalation_ticket_id=ticket_id,
+        )
+        return {
+            "escalated": True,
+            "escalation_reason": reason,
+            "escalation_ticket_id": ticket_id,
+            "final_response": response,
+        }
 
     return {"final_response": response}
 
@@ -228,6 +333,8 @@ def route_after_guardrail(state: AgentState) -> str:
     """Conditional router based on Laya classification."""
     if state.get("is_attack") or state.get("intent") in ["prompt_injection", "sql_attack"]:
         return "security_audit_node"
+    if state.get("requires_escalation"):
+        return "uncertainty_escalation_node"
     
     intent = state.get("intent", "factual_lookup")
     if intent == "database_aggregate":
@@ -250,6 +357,7 @@ def build_atlas_graph():
     # Add Nodes
     graph.add_node("guardrail_router_node", guardrail_router_node)
     graph.add_node("security_audit_node", security_audit_node)
+    graph.add_node("uncertainty_escalation_node", uncertainty_escalation_node)
     graph.add_node("sql_execution_node", sql_execution_node)
     graph.add_node("calculation_node", calculation_node)
     graph.add_node("retrieval_node", retrieval_node)
@@ -265,6 +373,7 @@ def build_atlas_graph():
         route_after_guardrail,
         {
             "security_audit_node": "security_audit_node",
+            "uncertainty_escalation_node": "uncertainty_escalation_node",
             "sql_execution_node": "sql_execution_node",
             "calculation_node": "calculation_node",
             "retrieval_node": "retrieval_node",
@@ -279,6 +388,7 @@ def build_atlas_graph():
 
     # Final terminations
     graph.add_edge("security_audit_node", END)
+    graph.add_edge("uncertainty_escalation_node", END)
     graph.add_edge("out_of_scope_node", END)
     graph.add_edge("synthesizer_node", END)
 
@@ -314,6 +424,7 @@ def run_agent_workflow(
         "intent": "factual_lookup",
         "router_confidence": 1.0,
         "is_attack": False,
+        "requires_escalation": False,
         "escalated": False,
         "escalation_reason": None,
         "escalation_ticket_id": None,

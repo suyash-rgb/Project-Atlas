@@ -115,8 +115,10 @@ flowchart TD
    - Clearly flags numbers as *derived estimates*, not quoted facts.
 
 4. **Security & Prompt Injection Defenses**:
-   - Treats retrieved document content strictly as data, neutralizing embedded instructions or prompt injections.
-   - Restricts agent-generated SQL to a dedicated SELECT-only MySQL account; escalation and feedback use a separate read-write account and transactional writes.
+   - Detects and logs instruction-like text embedded in retrieved reports, removes those instruction fragments before LLM synthesis, and preserves surrounding report facts.
+   - Validates numeric claims in retrieval-grounded answers against citations to exact retrieved report pages before streaming any answer tokens; unsupported claims are withheld and escalated for human review.
+   - Restricts agent-generated SQL to a dedicated read-only account, enforces a 100-row cap and database-native query deadline, and keeps escalation/feedback writes on a separate transactional role.
+   - Blocks projections that would rely on an unpurchased R-101 baseline and escalates requests beyond the available 2030 forecast horizon.
 
 5. **Human-in-the-Loop Escalation**:
    - Automatically escalates queries to human analysts via MySQL support tickets if model confidence falls below threshold.

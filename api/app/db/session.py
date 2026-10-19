@@ -210,6 +210,9 @@ class SQLiteConnectionWrapper:
     def rollback(self):
         self._conn.rollback()
 
+    def set_progress_handler(self, handler, instruction_interval: int):
+        self._conn.set_progress_handler(handler, instruction_interval)
+
     def close(self):
         try:
             self._conn.close()

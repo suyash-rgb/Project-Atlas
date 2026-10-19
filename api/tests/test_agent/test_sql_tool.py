@@ -27,10 +27,14 @@ class FakeConnection:
         self.fake_cursor = FakeCursor(rows)
         self.closed = False
         self.cursor_options = None
+        self.progress_handler = None
 
     def cursor(self, **kwargs):
         self.cursor_options = kwargs
         return self.fake_cursor
+
+    def set_progress_handler(self, handler, instruction_interval):
+        self.progress_handler = handler
 
     def close(self):
         self.closed = True
@@ -160,3 +164,43 @@ def test_execute_safe_sql_timeout_raises_timeout_error(monkeypatch):
     with pytest.raises(TimeoutError, match="exceeded timeout"):
         sql_tool.execute_safe_sql("SELECT report FROM reports", allowed_reports=["R-101"], timeout_seconds=0.05)
 
+    assert connection.progress_handler is None
+
+
+def test_mysql_timeout_setup_failure_prevents_query_execution(monkeypatch):
+    connection = FakeConnection([])
+    def fail_timeout_setup(query, params=None):
+        connection.fake_cursor.executed.append((query, params))
+        raise RuntimeError("timeout setting rejected")
+
+    connection.fake_cursor.execute = fail_timeout_setup
+    monkeypatch.setattr(sql_tool.settings, "DB_TYPE", "mysql")
+    monkeypatch.setattr(sql_tool, "get_db_connection", lambda **_: connection)
+
+    with pytest.raises(RuntimeError, match="Could not configure the MySQL query timeout"):
+        sql_tool.execute_safe_sql("SELECT report FROM reports", allowed_reports=["R-101"])
+
+    assert len(connection.fake_cursor.executed) == 1
+    assert connection.fake_cursor.closed
+    assert connection.closed
+
+
+def test_sqlite_progress_handler_interrupts_long_recursive_query(monkeypatch):
+    import sqlite3
+
+    from app.db.session import SQLiteConnectionWrapper
+
+    connection = SQLiteConnectionWrapper(sqlite3.connect(":memory:"))
+    monkeypatch.setattr(sql_tool.settings, "DB_TYPE", "sqlite")
+    monkeypatch.setattr(sql_tool, "get_db_connection", lambda **_: connection)
+
+    query = (
+        "WITH RECURSIVE counter AS ("
+        "SELECT 1 AS value "
+        "UNION ALL SELECT value + 1 FROM counter WHERE value < 100000000"
+        ") SELECT SUM(value) AS total FROM counter"
+    )
+    with pytest.raises(TimeoutError, match="exceeded timeout"):
+        sql_tool.execute_safe_sql(query, timeout_seconds=0.01)
+
+    connection.close()
