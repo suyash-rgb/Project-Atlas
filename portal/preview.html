@@ -445,22 +445,30 @@
         }
 
         function submitClientSignup() {
-            const cid = document.getElementById('signupClientId').value.trim().toUpperCase() || 'C-07';
+            const cid = document.getElementById('signupClientId').value.trim().toUpperCase() || ('C-' + Math.floor(100 + Math.random() * 900));
             const company = document.getElementById('signupCompanyName').value.trim() || 'New Enterprise Client';
             const email = document.getElementById('signupEmail').value.trim() || 'client@example.com';
 
-            activeClient = { id: cid, company: company, email: email };
-            currentCompanyName.textContent = activeClient.company;
-            currentClientIdBadge.textContent = activeClient.id;
+            // Add the newly registered company to the login dropdown
+            const existingOpt = Array.from(loginClientSelect.options).find(opt => opt.value === cid);
+            if (!existingOpt) {
+                const newOpt = document.createElement('option');
+                newOpt.value = cid;
+                newOpt.textContent = `[${cid}] ${company}`;
+                loginClientSelect.appendChild(newOpt);
+            }
+            loginClientSelect.value = cid;
+            document.getElementById('loginContactEmail').value = email;
 
-            closeAuthModal();
-            updateSidebarEntitlements();
+            // Switch to login tab and highlight the registered account
+            switchAuthTab('login');
 
-            chatStream.innerHTML = '';
-            appendAssistantResponse({
-                answer: `Welcome to Project Atlas, **${activeClient.company}** (${activeClient.id}). Your client account registration is confirmed. You can now explore entitled market intelligence and consult the Copilot.`,
-                confidence: 1.0
-            });
+            // Show confirmation toast/banner inside the modal
+            const hint = document.querySelector('.auth-hint');
+            if (hint) {
+                hint.innerHTML = `<i class="fa-solid fa-circle-check" style="color: #10b981;"></i> Account created for <strong>${company}</strong> (${cid}). Click 'Log In' below to start your session.`;
+                hint.style.color = '#10b981';
+            }
         }
 
         // Dynamic Entitlements API Integration
