@@ -178,6 +178,10 @@ header.main-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    width: 80vw;
+    margin: 10px auto;
+    border-radius: 40px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
 }
 
 .portal-sub-banner h3 {
@@ -213,7 +217,7 @@ header.main-header {
 .app-container {
     flex: 1;
     max-width: 1400px;
-    width: 100%;
+    width: 80%;
     margin: 1.25rem auto;
     padding: 0 1.5rem;
     display: grid;
@@ -345,9 +349,9 @@ header.main-header {
 }
 
 .chat-bubble {
-    max-width: 85%;
+    max-width: 68%;
     padding: 1.1rem 1.35rem;
-    border-radius: 10px;
+    border-radius: 25px;
     line-height: 1.6;
     font-size: 0.92rem;
     animation: slideIn 0.2s ease-out;
@@ -580,4 +584,227 @@ footer.main-footer a {
 
 footer.main-footer a:hover {
     color: #ffffff;
+}
+
+/* 6. Client Auth & Profile System (CI3 / Challenges.docx Alignment) */
+.user-profile-nav {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+    padding: 0.35rem 0.85rem;
+    background: #f8fafc;
+    border: 1px solid var(--cmr-border);
+    border-radius: 8px;
+    font-size: 0.82rem;
+}
+
+.user-profile-nav .company-name {
+    font-weight: 700;
+    color: var(--cmr-navy);
+}
+
+.user-profile-nav .client-tag {
+    background: #e0f2fe;
+    color: #0369a1;
+    font-size: 0.72rem;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+.btn-auth-action {
+    background: none;
+    border: none;
+    color: var(--cmr-text-muted);
+    font-size: 0.8rem;
+    cursor: pointer;
+    padding: 0.2rem 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: color 0.2s;
+}
+
+.btn-auth-action:hover {
+    color: #ef4444;
+}
+
+.btn-login-trigger {
+    background: var(--cmr-primary-blue);
+    color: #ffffff;
+    border: none;
+    padding: 0.4rem 0.9rem;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: background 0.2s;
+}
+
+.btn-login-trigger:hover {
+    background: var(--cmr-hover-blue);
+}
+
+/* Auth Modal Overlay */
+.auth-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(15, 23, 42, 0.65);
+    backdrop-filter: blur(4px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+    animation: fadeIn 0.25s ease-out forwards;
+}
+
+.auth-modal-card {
+    background: #ffffff;
+    width: 100%;
+    max-width: 440px;
+    border-radius: 12px;
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    border: 1px solid var(--cmr-border);
+}
+
+.auth-modal-header {
+    background: linear-gradient(135deg, var(--cmr-navy) 0%, #003366 100%);
+    color: #ffffff;
+    padding: 1.25rem 1.5rem;
+    position: relative;
+}
+
+.auth-modal-header h3 {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.auth-modal-header p {
+    margin: 0.35rem 0 0 0;
+    font-size: 0.8rem;
+    color: #cbd5e1;
+}
+
+.auth-modal-close {
+    position: absolute;
+    top: 1.1rem;
+    right: 1.25rem;
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+.auth-modal-close:hover {
+    color: #ffffff;
+}
+
+.auth-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--cmr-border);
+    background: #f8fafc;
+}
+
+.auth-tab {
+    flex: 1;
+    text-align: center;
+    padding: 0.75rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--cmr-text-muted);
+    cursor: pointer;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.auth-tab.active {
+    color: var(--cmr-primary-blue);
+    border-bottom-color: var(--cmr-primary-blue);
+    background: #ffffff;
+}
+
+.auth-modal-body {
+    padding: 1.5rem;
+}
+
+.auth-form-group {
+    margin-bottom: 1rem;
+}
+
+.auth-form-group label {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--cmr-text-dark);
+    margin-bottom: 0.35rem;
+}
+
+.auth-form-group input,
+.auth-form-group select {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border: 1px solid var(--cmr-border);
+    border-radius: 6px;
+    font-size: 0.85rem;
+    color: var(--cmr-text-dark);
+    outline: none;
+    transition: border-color 0.2s;
+    background: #ffffff;
+}
+
+.auth-form-group input:focus,
+.auth-form-group select:focus {
+    border-color: var(--cmr-primary-blue);
+    box-shadow: 0 0 0 3px rgba(0, 86, 179, 0.1);
+}
+
+.btn-auth-submit {
+    width: 100%;
+    background: var(--cmr-primary-blue);
+    color: #ffffff;
+    border: none;
+    padding: 0.7rem;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+    margin-top: 0.5rem;
+}
+
+.btn-auth-submit:hover {
+    background: var(--cmr-hover-blue);
+}
+
+.auth-hint {
+    margin-top: 0.9rem;
+    font-size: 0.75rem;
+    color: var(--cmr-text-muted);
+    line-height: 1.4;
+    text-align: center;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }

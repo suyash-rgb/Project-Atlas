@@ -40,18 +40,79 @@
             <a href="#" class="nav-link active">Report Copilot (AI)</a>
             <a href="#" class="nav-link">Athenaeum Access</a>
 
-            <!-- Client Entitlement Switcher -->
-            <div class="client-entitlement-box">
-                <i class="fa-solid fa-building-user" style="color: var(--cmr-primary-blue);"></i>
-                <label for="clientSelect">Client Entitlement:</label>
-                <select id="clientSelect" onchange="updateSidebarEntitlements()">
-                    <?php foreach ($clients as $cid => $cname): ?>
-                        <option value="<?php echo html_escape($cid); ?>"><?php echo html_escape("[$cid] $cname"); ?></option>
-                    <?php endforeach; ?>
-                </select>
+            <!-- Corporate Client Account Profile & Switch Session -->
+            <div id="authProfileContainer" class="user-profile-nav">
+                <i class="fa-solid fa-building" style="color: var(--cmr-primary-blue);"></i>
+                <span class="company-name" id="currentCompanyName">Northwind Utilities</span>
+                <span class="client-tag" id="currentClientIdBadge">C-01</span>
+                <button class="btn-auth-action" onclick="openAuthModal()" title="Switch Client Account / Log In">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Switch
+                </button>
             </div>
         </nav>
     </header>
+
+    <!-- Client Authentication Modal (Login / Signup) -->
+    <div class="auth-modal-overlay" id="authModal">
+        <div class="auth-modal-card">
+            <div class="auth-modal-header">
+                <button class="auth-modal-close" onclick="closeAuthModal()">&times;</button>
+                <h3><i class="fa-solid fa-shield-halved"></i> Client Portal Access</h3>
+                <p>Authenticate as an enterprise client to access licensed reports</p>
+            </div>
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tabLogin" onclick="switchAuthTab('login')">Client Sign In</button>
+                <button class="auth-tab" id="tabSignup" onclick="switchAuthTab('signup')">Register Client</button>
+            </div>
+            <div class="auth-modal-body">
+                <!-- Login View -->
+                <div id="loginFormView">
+                    <div class="auth-form-group">
+                        <label for="loginClientSelect">Select Corporate Client Account:</label>
+                        <select id="loginClientSelect">
+                            <?php foreach ($clients as $cid => $cname): ?>
+                                <option value="<?php echo html_escape($cid); ?>"><?php echo html_escape("[$cid] $cname"); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="auth-form-group">
+                        <label for="loginContactEmail">Authorized Corporate Email:</label>
+                        <input type="email" id="loginContactEmail" value="ops@example.com" placeholder="e.g. ops@northwind.example.com">
+                    </div>
+                    <button class="btn-auth-submit" onclick="submitClientLogin()">
+                        <i class="fa-solid fa-lock-open"></i> Log In to Report Copilot
+                    </button>
+                </div>
+
+                <!-- Signup View -->
+                <div id="signupFormView" style="display: none;">
+                    <div class="auth-form-group">
+                        <label for="signupClientId">Assigned Client Identifier:</label>
+                        <input type="text" id="signupClientId" placeholder="e.g. C-07">
+                    </div>
+                    <div class="auth-form-group">
+                        <label for="signupCompanyName">Company Name:</label>
+                        <input type="text" id="signupCompanyName" placeholder="e.g. Apex Power & Water Corp">
+                    </div>
+                    <div class="auth-form-group">
+                        <label for="signupEmail">Corporate Contact Email:</label>
+                        <input type="email" id="signupEmail" placeholder="e.g. research@apexpower.example.com">
+                    </div>
+                    <div class="auth-form-group">
+                        <label for="signupPurchasedReports">Initial Purchased Reports:</label>
+                        <input type="text" id="signupPurchasedReports" placeholder="e.g. R-101, R-103">
+                    </div>
+                    <button class="btn-auth-submit" onclick="submitClientSignup()">
+                        <i class="fa-solid fa-user-plus"></i> Create Client Account
+                    </button>
+                </div>
+
+                <div class="auth-hint">
+                    <i class="fa-solid fa-circle-info"></i> Client session is authenticated securely and grants access strictly to your corporate licensed reports.
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- 3. Portal Sub-Banner -->
     <div class="portal-sub-banner">
@@ -102,7 +163,7 @@
 
             <!-- Message Stream -->
             <div class="chat-stream" id="chatStream">
-                <div class="chat-bubble assistant-bubble">
+                <div class="assistant-bubble">
                     <div class="meta-badges-row">
                         <span class="badge-pill conf">SYSTEM INITIALIZED</span>
                         <span class="badge-pill router">ENTITLEMENTS VERIFIED</span>
@@ -153,11 +214,95 @@
         const chatStream = document.getElementById('chatStream');
         const chatInput = document.getElementById('chatInput');
         const sendBtn = document.getElementById('sendBtn');
-        const clientSelect = document.getElementById('clientSelect');
         const entitlementList = document.getElementById('entitlementList');
+        const authModal = document.getElementById('authModal');
+        const loginClientSelect = document.getElementById('loginClientSelect');
+        const currentCompanyName = document.getElementById('currentCompanyName');
+        const currentClientIdBadge = document.getElementById('currentClientIdBadge');
+
+        // Corporate Client Session State
+        let activeClient = {
+            id: 'C-01',
+            company: 'Northwind Utilities',
+            email: 'ops@northwind.example.com'
+        };
+
+        // Modal Controls
+        function openAuthModal() {
+            authModal.style.display = 'flex';
+        }
+
+        function closeAuthModal() {
+            authModal.style.display = 'none';
+        }
+
+        function switchAuthTab(tab) {
+            const tabLogin = document.getElementById('tabLogin');
+            const tabSignup = document.getElementById('tabSignup');
+            const loginView = document.getElementById('loginFormView');
+            const signupView = document.getElementById('signupFormView');
+
+            if (tab === 'login') {
+                tabLogin.classList.add('active');
+                tabSignup.classList.remove('active');
+                loginView.style.display = 'block';
+                signupView.style.display = 'none';
+            } else {
+                tabSignup.classList.add('active');
+                tabLogin.classList.remove('active');
+                loginView.style.display = 'none';
+                signupView.style.display = 'block';
+            }
+        }
+
+        function submitClientLogin() {
+            const cid = loginClientSelect.value;
+            const email = document.getElementById('loginContactEmail').value.trim();
+            const selectedText = loginClientSelect.options[loginClientSelect.selectedIndex].text;
+            
+            const compMatch = selectedText.match(/\[C-\d+\]\s*(.*?)(?:\s*\(|$)/);
+            const compName = compMatch ? compMatch[1].trim() : selectedText;
+
+            activeClient = {
+                id: cid,
+                company: compName,
+                email: email || `${cid.toLowerCase()}@client.example.com`
+            };
+
+            currentCompanyName.textContent = activeClient.company;
+            currentClientIdBadge.textContent = activeClient.id;
+
+            closeAuthModal();
+            updateSidebarEntitlements();
+
+            chatStream.innerHTML = '';
+            appendAssistantResponse({
+                answer: `Welcome back, **${activeClient.company}** (${activeClient.id}). Your secure enterprise session is active. You have full analytical clearance to query your licensed research reports. How can I assist your team today?`,
+                confidence: 1.0
+            });
+        }
+
+        function submitClientSignup() {
+            const cid = document.getElementById('signupClientId').value.trim().toUpperCase() || 'C-07';
+            const company = document.getElementById('signupCompanyName').value.trim() || 'New Enterprise Client';
+            const email = document.getElementById('signupEmail').value.trim() || 'client@example.com';
+            
+            activeClient = { id: cid, company: company, email: email };
+            currentCompanyName.textContent = activeClient.company;
+            currentClientIdBadge.textContent = activeClient.id;
+
+            closeAuthModal();
+            updateSidebarEntitlements();
+
+            chatStream.innerHTML = '';
+            appendAssistantResponse({
+                answer: `Welcome to Project Atlas, **${activeClient.company}** (${activeClient.id}). Your client account registration is confirmed.`,
+                confidence: 1.0
+            });
+        }
 
         async function updateSidebarEntitlements() {
-            const cid = clientSelect.value;
+            const cid = activeClient.id;
             entitlementList.innerHTML = '<div style="font-size: 0.78rem; color: #64748b; padding: 0.5rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading entitled reports...</div>';
 
             try {
@@ -260,7 +405,7 @@
 
         function appendUserMessage(text) {
             const bubble = document.createElement('div');
-            bubble.className = 'chat-bubble user-bubble';
+            bubble.className = 'user-bubble';
             bubble.textContent = text;
             chatStream.appendChild(bubble);
             chatStream.scrollTop = chatStream.scrollHeight;
@@ -441,7 +586,7 @@
             chatInput.value = '';
             sendBtn.disabled = true;
 
-            const clientId = clientSelect.value;
+            const clientId = activeClient.id;
             const streaming = createStreamingBubble();
             let completeResponse = null;
             let receivedToken = false;
@@ -542,7 +687,7 @@
                     method: 'POST',
                     headers: reqHeaders,
                     body: JSON.stringify({
-                        client_id: clientSelect.value,
+                        client_id: activeClient.id,
                         message_id: messageId || ('msg-' + Date.now()),
                         rating: rating === 1 ? 'up' : 'down',
                         comment: rating === 1 ? 'Helpful and accurate response.' : 'Flagged as inaccurate or incomplete.',
