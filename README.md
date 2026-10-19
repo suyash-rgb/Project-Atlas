@@ -94,7 +94,153 @@ SEMANTIC_CACHE_THRESHOLD=0.90
 
 ---
 
-### 3. Launch the Stack
+### 3. Docker Compose Orchestration (`docker-compose.yml`)
+
+The multi-container topology is declared in [`docker-compose.yml`](docker-compose.yml). It ingests the `.env` variables above and links the database, vector cache, intelligence engine, and PHP gateway on an isolated internal bridge network (`atlas_network`):
+
+```yaml
+services:
+  # -------------------------------------------------------------
+  # 1. MySQL Relational Database (Reports, Metrics, Clients, Audits)
+  # -------------------------------------------------------------
+  db:
+    image: mysql:8.0
+    container_name: atlas_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_DATABASE: project_atlas
+    ports:
+      - "${MYSQL_HOST_PORT:-3307}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - atlas_network
+
+  db-roles:
+    image: mysql:8.0
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "/scripts/create-readonly-user.sh"]
+    environment:
+      MYSQL_HOST: db
+      MYSQL_DATABASE: project_atlas
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_READONLY_USER: ${MYSQL_READONLY_USER:?Set MYSQL_READONLY_USER in .env}
+      MYSQL_READONLY_PASSWORD: ${MYSQL_READONLY_PASSWORD:?Set MYSQL_READONLY_PASSWORD in .env}
+    volumes:
+      - ./docker/mysql/create-readonly-user.sh:/scripts/create-readonly-user.sh:ro
+    networks:
+      - atlas_network
+
+  # -------------------------------------------------------------
+  # 2. FastAPI Intelligence Engine (LangGraph + Laya 421M + RAG)
+  # -------------------------------------------------------------
+  api:
+    build:
+      context: .
+      dockerfile: api/Dockerfile
+    container_name: atlas_api
+    restart: unless-stopped
+    depends_on:
+      db-roles:
+        condition: service_completed_successfully
+    ports:
+      - "8000:8000"
+      - "8888:8000"
+    environment:
+      API_KEY: ${API_KEY:?Set API_KEY in .env}
+      GROQ_API_KEY: ${GROQ_API_KEY:?Set GROQ_API_KEY in .env}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
+      MYSQL_HOST: db
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: project_atlas
+      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      MYSQL_READONLY_USER: ${MYSQL_READONLY_USER:?Set MYSQL_READONLY_USER in .env}
+      MYSQL_READONLY_PASSWORD: ${MYSQL_READONLY_PASSWORD:?Set MYSQL_READONLY_PASSWORD in .env}
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
+      HF_HOME: /app/data/.cache/huggingface
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      SEMANTIC_CACHE_ENABLED: ${SEMANTIC_CACHE_ENABLED:-true}
+      SEMANTIC_CACHE_THRESHOLD: ${SEMANTIC_CACHE_THRESHOLD:-0.90}
+    volumes:
+      - ./models:/app/models
+      - ./data:/app/data
+    networks:
+      - atlas_network
+
+  # -------------------------------------------------------------
+  # 3. Redis Vector Engine for Semantic Caching
+  # -------------------------------------------------------------
+  redis:
+    image: redis/redis-stack-server:latest
+    container_name: atlas_redis
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - atlas_network
+
+  # -------------------------------------------------------------
+  # 4. CodeIgniter 3 Corporate Portal (Cognitive Market Research)
+  # -------------------------------------------------------------
+  portal:
+    build:
+      context: ./portal
+      dockerfile: Dockerfile
+    container_name: atlas_portal
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+      db-roles:
+        condition: service_completed_successfully
+    ports:
+      - "8080:80"
+    environment:
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080/}
+      FASTAPI_URL: ${FASTAPI_URL:?Set FASTAPI_URL in .env}
+      ATLAS_API_KEY: ${API_KEY:?Set API_KEY in .env}
+      DB_HOST: ${DB_HOST:?Set DB_HOST in .env}
+      DB_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
+      DB_PASS: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
+      DB_NAME: project_atlas
+      DB_PORT: 3306
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+    networks:
+      - atlas_network
+
+networks:
+  atlas_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
+  redis_data:
+    driver: local
+```
+
+---
+
+### 4. Launch the Stack
 
 Run Docker Compose to build and launch all containers in detached mode:
 
@@ -116,7 +262,7 @@ select a seeded client or claim paid reports.
 
 ---
 
-### 4. Verify Service Health
+### 5. Verify Service Health
 
 Check container status:
 

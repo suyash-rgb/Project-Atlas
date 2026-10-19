@@ -10,11 +10,15 @@ Here are the 5 high-impact initiatives I would execute, organized by technical l
 
 ---
 
-### 1. Advanced Graph Speculative Execution & Parallel Verification
-* **Current State**: Our LangGraph agent executes a linear DAG: `Router` $\rightarrow$ (`Retriever` + `SQL Tool`) $\rightarrow$ `Critic / Reconcile` $\rightarrow$ `Synthesizer` $\rightarrow$ `Writer / SSE Stream`.
+### 1. Multi-Turn Conversational Memory & Follow-Up Context Resolution ([GitHub Issue #1](https://github.com/suyash-rgb/Project-Atlas/issues/1))
+* **Current State**: 
+  - While our CodeIgniter 3 portal records question-answer pairs in MySQL, each FastAPI request is currently evaluated in isolation.
+  - Short follow-up queries (such as *"What about 2030?"* or *"Can you explain that scope difference?"*) arrive at the router without the subject, report ID, or topic established in the preceding turn.
 * **One-Week Enhancement**:
-  - Implement **Speculative RAG pipelining**: while the Laya 421M router classifies query intent ($<40\text{ ms}$), simultaneously initiate asynchronous hybrid vector pre-fetching based on top keywords.
-  - Implement **Multi-Critic Speculative Drafting**: run a secondary lightweight critic LLM (e.g., `llama-3.2-1b`) in parallel with the streaming synthesizer to verify numerical token citations on the fly, cancelling or injecting real-time inline footnotes before the stream concludes.
+  - **History-Aware Query Resolution**: Implement a lightweight pre-router step that inspects the last 2–3 turns of trusted session history and rewrites the user's follow-up into a self-contained standalone question (e.g., resolving *"What about 2030?"* into *"What is the projected 2030 market size for smart water meters in report R-101?"*). If the reference is ambiguous, politely prompt the user for clarification.
+  - **Raw Security Screening First**: Check the raw user message with the Laya 421M guardrail *before* contextual rewriting, ensuring prompt injections cannot hide inside conversational context.
+  - **Re-Routing on the Resolved Question**: Run the Laya intent router on the *resolved* question every turn so the agent can seamlessly switch tools (e.g., pivoting from `factual_lookup` to `calculation`).
+  - **Fresh Evidence & Semantic Cache Protection**: Always pull fresh evidence from ChromaDB or the deterministic Python calculator rather than treating previous assistant text as ground truth. In addition, key Redis semantic caches by the resolved question to prevent cross-conversation cache collisions.
 
 ---
 
