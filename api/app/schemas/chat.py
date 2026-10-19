@@ -17,6 +17,11 @@ class ChatRequest(BaseModel):
         max_length=4000,
         description="Natural language question or prompt",
     )
+    conversation_history: List["ConversationTurn"] = Field(
+        default_factory=list,
+        max_length=8,
+        description="Recent user/assistant turns for resolving follow-up questions",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -25,6 +30,11 @@ class ChatRequest(BaseModel):
             if "query" in data and not data.get("question"):
                 data["question"] = data["query"]
         return data
+
+
+class ConversationTurn(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str = Field(..., min_length=1, max_length=2000)
 
 
 class IngestPage(BaseModel):
@@ -99,6 +109,7 @@ class ChatResponse(BaseModel):
     derived_values: List[DerivedValueItem] = Field(default_factory=list)
     escalated: bool = False
     escalation_ticket_id: Optional[str] = None
+    clarification_needed: bool = False
 
 
 class EscalationItem(BaseModel):
