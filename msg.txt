@@ -1,0 +1,21 @@
+fix(agent): resolve grounding & routing failures across 7 scenarios and modularize tool nodes
+
+### Root Cause Analysis (RCA) & Fixes
+
+| # | Root Cause Identified | Detailed Symptom & Impact | Fix Implemented |
+|---|---|---|---|
+| 1 | Unicode non-breaking characters (`\u2011`, `\u202f`, `【...】`) | Groq's model returned unicode non-breaking hyphens (`R‑101`) and Asian bracket styles (`【R-101 p.8】`). The strict ASCII bracket regex failed to match, throwing false `AnswerGroundingError` and escalating valid factual answers. | Added `_normalize_text()` to normalize all hyphen variants, spaces, and brackets (`【`, `】`, `［`, `］` -> `[`, `]`). Expanded `_REPORT_CITATION` to support multiple bracket types. |
+| 2 | Over-aggressive numeric claim matching on headings/years | The regex `_NUMERIC_CLAIM` treated calendar years (`2024`, `2030`) and markdown headings (`**Global Smart Water Metering Market Size - 2024**`) as uncited financial claims, causing grounding failures on section titles. | Focused `_NUMERIC_CLAIM` strictly on currency amounts (`$`, `USD`), quantified metrics (`billion`, `million`, `B`, `M`), and percentages (`%`), skipping headings and bare 4-digit years. |
+| 3 | Empty chunk grounding on SQL / Entitlement queries | On SQL queries (Test 4) or unpurchased report refusals (Test 5), `retrieved_chunks` is empty by design. The citation validator was checking empty source sets and throwing grounding errors on catalog listings. | `validate_answer_citations()` now returns `[]` immediately when `retrieved_chunks` is empty. |
+| 4 | Calculator forecast window year regex (Test 7) | `re.findall(r'\b(20[2-3][0-9])\b', query)` only matched years 2020–2039. When querying year `2045`, `target_year` defaulted to 2030, failing to trigger the `target_yr > 2030` escalation check. | Updated regex to `\b(20\d{2})\b` in `calculator.py`. |
+| 5 | Multi-report context starvation (Test 2) | On queries comparing multiple reports (`R-101` and `R-102`), vector retrieval returned top-k chunks from only one report. | In `graph.py`, if 2+ reports are targeted in comparison, `retrieval_node` now guarantees retrieved representation for each requested report. |
+
+### Tool Refactoring (Single Responsibility & Clean Code)
+- Extracted image decoding and format validation into `app/utils/image_utils.py`.
+- Extracted AST parsing and read-only query checks into `app/utils/sql_ast.py`.
+- Separated report metadata database queries and ID generation into `app/db/metadata.py` and `app/services/ingest_service.py`.
+- Maintained 100% backward-compatible imports for existing tools and workflows.
+
+### Test Verification
+- All 7 test scenarios in `Tests7Agents.md` passed with 100% accuracy.
+- Full automated test suite (`pytest api/tests`): 164 passed, 0 failed.

@@ -13,6 +13,7 @@ Orchestrates:
 
 from typing import Callable, List, Dict, Any, Optional
 import logging
+import re
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, END
 from langchain_core.runnables import RunnableConfig
@@ -245,13 +246,31 @@ def retrieval_node(state: AgentState) -> Dict[str, Any]:
     Node 2C: Entitlement-filtered vector search over ingested PDF reports.
     """
     retriever = get_retriever()
+    q = state["question"]
+    purchased = state["purchased_reports"]
+
+    raw_mentioned = re.findall(r"\b[rR][-‐‑–—]?(\d{3})\b", q)
+    target_reports = [f"R-{num}" for num in raw_mentioned if f"R-{num}" in purchased]
+
     chunks = retriever.retrieve_for_client(
-        query=state["question"],
-        purchased_reports=state["purchased_reports"],
-        top_k=5
+        query=q,
+        purchased_reports=purchased,
+        top_k=6
     )
 
-    conflicts = detect_report_conflicts(state["question"], chunks)
+    # If multiple reports are explicitly targeted, ensure all targeted reports have retrieved evidence
+    if len(set(target_reports)) >= 2:
+        retrieved_rep_ids = {c.report_id for c in chunks}
+        for rep in set(target_reports):
+            if rep not in retrieved_rep_ids:
+                rep_chunks = retriever.retrieve_for_client(
+                    query=f"{rep} market size 2024 methodology",
+                    purchased_reports=[rep],
+                    top_k=3
+                )
+                chunks.extend(rep_chunks)
+
+    conflicts = detect_report_conflicts(q, chunks)
 
     return {
         "retrieved_chunks": chunks,

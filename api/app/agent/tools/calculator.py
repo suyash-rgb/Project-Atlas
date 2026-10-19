@@ -58,7 +58,7 @@ def extract_numbers_from_query(query: str) -> Dict[str, float]:
         found["cagr_pct"] = float(pct_match.group(1))
 
     # Check for years
-    all_years = [int(y) for y in re.findall(r'\b(20[2-3][0-9])\b', query)]
+    all_years = [int(y) for y in re.findall(r'\b(20\d{2})\b', query)]
     if len(all_years) >= 2:
         y1, y2 = min(all_years), max(all_years)
         found["start_year"] = float(y1)

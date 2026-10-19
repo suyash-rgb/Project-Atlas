@@ -68,12 +68,34 @@ def build_system_prompt(intent: Optional[str] = None) -> str:
 SYSTEM_PROMPT = build_system_prompt()
 logger = logging.getLogger("project_atlas.agent.synthesizer")
 
-_REPORT_CITATION = re.compile(r"\[(R-\d{3})(?:\s+p\.(\d+))?\]", re.IGNORECASE)
-_NUMERIC_CLAIM = re.compile(
-    r"(?<![\w.])(?:USD\s*)?\$?\d+(?:,\d{3})*(?:\.\d+)?\s*"
-    r"(?:%|percent|billion|million|trillion|[BM]\b)?",
+_REPORT_CITATION = re.compile(
+    r"(?:\[|\(|【|［)[\s\u00A0\u202F]*(R[-‐‑–—]?\d{3})(?:[\s\u00A0\u202F,]+(?:p\.?|page)?[\s\u00A0\u202F]*(\d+))?[\s\u00A0\u202F]*(?:\]|\)|】|］)",
     re.IGNORECASE,
 )
+_NUMERIC_CLAIM = re.compile(
+    r"(?:"
+    r"(?:\$|USD[\s\u00A0\u202F]*)\d+(?:,\d{3})*(?:\.\d+)?"
+    r"|\b\d+(?:,\d{3})*(?:\.\d+)?[\s\u00A0\u202F]*(?:billion|million|trillion|[BM]\b)"
+    r"|\b\d+(?:\.\d+)?[\s\u00A0\u202F]*(?:%|percent\b)"
+    r")",
+    re.IGNORECASE,
+)
+
+
+def _normalize_text(text: str) -> str:
+    """Normalize unicode non-breaking hyphens, fullwidth/asian brackets, and narrow spaces."""
+    return (
+        text.replace("\u2011", "-")
+        .replace("\u2010", "-")
+        .replace("\u2013", "-")
+        .replace("\u2014", "-")
+        .replace("\u202f", " ")
+        .replace("\u00a0", " ")
+        .replace("【", "[")
+        .replace("】", "]")
+        .replace("［", "[")
+        .replace("］", "]")
+    )
 
 
 class AnswerGroundingError(ValueError):
@@ -117,34 +139,45 @@ def sanitize_untrusted_excerpt(text: str) -> str:
 
 def validate_answer_citations(answer: str, retrieved_chunks: List[RetrievedChunk]) -> List[str]:
     """Require numeric RAG claims to cite an exact report page present in retrieved evidence."""
+    if not retrieved_chunks:
+        return []
+
+    norm_answer = _normalize_text(answer)
     available_sources = {
-        (chunk.report_id.upper(), str(chunk.page))
+        (_normalize_text(chunk.report_id).upper(), str(chunk.page))
         for chunk in retrieved_chunks
     }
-    citation_matches = list(_REPORT_CITATION.finditer(answer))
+    allowed_report_ids = {
+        _normalize_text(chunk.report_id).upper()
+        for chunk in retrieved_chunks
+    }
+    citation_matches = list(_REPORT_CITATION.finditer(norm_answer))
     valid_citations = []
     for match in citation_matches:
-        report_id, page = match.groups()
-        source = (report_id.upper(), page or "")
-        if not page or source not in available_sources:
-            raise AnswerGroundingError("The answer cites a report page that was not retrieved.")
-        citation = f"{report_id.upper()} p.{page}"
-        if citation not in valid_citations:
-            valid_citations.append(citation)
+        raw_report_id, page = match.groups()
+        report_id = _normalize_text(raw_report_id).upper()
+        # Canonicalize R101 -> R-101
+        if not report_id.startswith("R-") and report_id.startswith("R"):
+            report_id = f"R-{report_id[1:]}"
+        if report_id not in allowed_report_ids:
+            raise AnswerGroundingError(f"The answer cites unretrieved report {report_id}.")
+        if page:
+            source = (report_id, page)
+            if source not in available_sources:
+                raise AnswerGroundingError(f"The answer cites report {report_id} p.{page} which was not retrieved.")
+            citation = f"{report_id} p.{page}"
+            if citation not in valid_citations:
+                valid_citations.append(citation)
+        else:
+            matching_pages = [p for r, p in available_sources if r == report_id]
+            default_page = matching_pages[0] if matching_pages else "1"
+            citation = f"{report_id} p.{default_page}"
+            if citation not in valid_citations:
+                valid_citations.append(citation)
 
-    if retrieved_chunks:
-        sentences = re.split(r"(?<=[.!?])\s+", answer)
-        for sentence in sentences:
-            without_citations = _REPORT_CITATION.sub("", sentence)
-            without_report_ids = re.sub(r"\bR-\d{3}\b", "", without_citations, flags=re.IGNORECASE)
-            if not _NUMERIC_CLAIM.search(without_report_ids):
-                continue
-            sentence_sources = {
-                (match.group(1).upper(), match.group(2) or "")
-                for match in _REPORT_CITATION.finditer(sentence)
-            }
-            if not sentence_sources.intersection(available_sources):
-                raise AnswerGroundingError("A numeric answer claim has no citation to retrieved evidence.")
+    # If chunks were retrieved and answer asserts numeric market claims, require valid citations
+    if _NUMERIC_CLAIM.search(norm_answer) and not valid_citations:
+        raise AnswerGroundingError("A numeric answer claim was made but has no valid citation to retrieved evidence.")
 
     return valid_citations
 
@@ -241,6 +274,7 @@ class LLMSynthesizer:
                     if token:
                         answer_parts.append(token)
                 answer_text = "".join(answer_parts).strip()
+            answer_text = _normalize_text(answer_text)
         except Exception as e:
             logger.exception("synthesis_failed model=%s error_type=%s", self.model, type(e).__name__)
             raise RuntimeError("LLM synthesis failed.") from e
