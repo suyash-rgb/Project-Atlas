@@ -1,4 +1,7 @@
-<img width="1917" height="927" alt="image" src="https://github.com/user-attachments/assets/594ac3ed-3f7e-4b46-b733-47b55b5c5287" /># Project Atlas — Comprehensive Evaluation Report
+<img width="1917" height="927" alt="image" src="https://github.com/user-attachments/assets/594ac3ed-3f7e-4b46-b733-47b55b5c5287" />
+
+# Project Atlas — Comprehensive Evaluation Report
+
 ### Cognitive Market Research & Consulting | Agentic AI Report Copilot Benchmark
 
 **Date**: October 19, 2026  
