@@ -32,6 +32,14 @@ CREATE TABLE IF NOT EXISTS clients (
     purchased_reports TEXT NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS client_accounts (
+    client_id VARCHAR(32) PRIMARY KEY,
+    email VARCHAR(254) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 CREATE TABLE IF NOT EXISTS escalations (
     id INT AUTO_INCREMENT PRIMARY KEY,
     client_id VARCHAR(32) NOT NULL,
@@ -68,7 +76,7 @@ INSERT IGNORE INTO reports (id, title, publisher, published, sector, access) VAL
 ('R-102', 'Smart Water Metering: Industry Outlook 2024', 'Aquila Insights (third party)', '2024-06-18', 'Utilities', 'public excerpt'),
 ('R-103', 'Residential Water Purifier Market 2025', 'CMR', '2025-01-22', 'Consumer Durables', 'paid'),
 ('R-104', 'Commercial & Industrial RO Membrane Systems 2025', 'CMR', '2025-02-14', 'Industrial Equipment', 'paid'),
-('R-105', 'Smart Multi-Utility Metering Infrastructure 2024', 'Apex Grid Insights (third party)', '2024-08-05', 'Utilities', 'public excerpt'),
+('R-105', 'Smart Multi-Utility Metering Infrastructure 2024', 'Apex Grid Insights (third party)', '2024-08-05', 'Utilities', 'paid'),
 ('R-106', 'Decentralized Wastewater Recycling Systems 2025', 'CMR', '2025-02-28', 'Cleantech', 'paid');
 
 -- 3. Seed Market Metrics
@@ -100,6 +108,15 @@ INSERT IGNORE INTO clients (id, company, contact_email, purchased_reports) VALUE
 ('C-04', 'City of Austin Water Utility', 'ami-lead@austin.gov.example.com', 'R-101'),
 ('C-05', 'Global Grid Analytics', 'subs@globalgrid.example.com', 'R-105'),
 ('C-06', 'Public Tier Evaluation', 'visitor@cmr-trial.example.com', '');
+
+-- 5. Seed Client Accounts (Default password for all fixtures: Password123!@#)
+INSERT IGNORE INTO client_accounts (client_id, email, password_hash) VALUES
+('C-01', 'ops@northwind.example.com', '$2y$10$TRZw8Pwu5nZ7lB8eg7GVh.dLEgxkHCiVfUHszO3Zoz3ZknTC6az02'),
+('C-02', 'procurement@bluedelta.example.com', '$2y$10$TRZw8Pwu5nZ7lB8eg7GVh.dLEgxkHCiVfUHszO3Zoz3ZknTC6az02'),
+('C-03', 'research@aquatech.example.com', '$2y$10$TRZw8Pwu5nZ7lB8eg7GVh.dLEgxkHCiVfUHszO3Zoz3ZknTC6az02'),
+('C-04', 'ami-lead@austin.gov.example.com', '$2y$10$TRZw8Pwu5nZ7lB8eg7GVh.dLEgxkHCiVfUHszO3Zoz3ZknTC6az02'),
+('C-05', 'subs@globalgrid.example.com', '$2y$10$TRZw8Pwu5nZ7lB8eg7GVh.dLEgxkHCiVfUHszO3Zoz3ZknTC6az02'),
+('C-06', 'visitor@cmr-trial.example.com', '$2y$10$TRZw8Pwu5nZ7lB8eg7GVh.dLEgxkHCiVfUHszO3Zoz3ZknTC6az02');
 
 -- Application users and least-privilege grants are provisioned by the
 -- db-roles Compose service from environment-provided credentials.

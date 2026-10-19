@@ -37,6 +37,10 @@ def test_readonly_database_user_can_select_but_cannot_write():
         with pytest.raises(mysql.connector.Error) as error:
             cursor.execute("UPDATE feedback SET rating = rating WHERE 1 = 0")
         assert error.value.errno == 1142
+
+        with pytest.raises(mysql.connector.Error) as error:
+            cursor.execute("SELECT password_hash FROM client_accounts LIMIT 1")
+        assert error.value.errno == 1142
     finally:
         connection.rollback()
         cursor.close()

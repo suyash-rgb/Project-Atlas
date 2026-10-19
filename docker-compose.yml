@@ -114,6 +114,7 @@ services:
     ports:
       - "8080:80"
     environment:
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080/}
       FASTAPI_URL: ${FASTAPI_URL:?Set FASTAPI_URL in .env}
       ATLAS_API_KEY: ${API_KEY:?Set API_KEY in .env}
       DB_HOST: ${DB_HOST:?Set DB_HOST in .env}
@@ -121,6 +122,7 @@ services:
       DB_PASS: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
       DB_NAME: project_atlas
       DB_PORT: 3306
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
     networks:
       - atlas_network
 

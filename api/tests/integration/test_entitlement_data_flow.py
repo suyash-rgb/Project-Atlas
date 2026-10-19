@@ -40,8 +40,8 @@ def test_chat_aggregate_only_passes_entitled_and_public_reports_to_writer(
     )
 
     assert response.status_code == 200
-    assert {row["id"] for row in captured_sql_rows} == {"R-102", "R-103", "R-105"}
+    assert {row["id"] for row in captured_sql_rows} == {"R-102", "R-103"}
     assert "R-101" not in response.json()["answer"]
     assert "R-102" in response.json()["answer"]
     assert "R-103" in response.json()["answer"]
-    assert "R-105" in response.json()["answer"]
+    assert "R-105" not in response.json()["answer"]

@@ -1,7 +1,8 @@
 import logging
 from typing import List, Dict, Any
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Security, status
 
+from app.api.deps import verify_api_key
 from app.services.client_service import client_service
 
 logger = logging.getLogger("project_atlas.clients_api")
@@ -14,7 +15,7 @@ router = APIRouter(prefix="/clients", tags=["Clients & Entitlements"])
     summary="List all registered corporate clients",
     status_code=status.HTTP_200_OK,
 )
-def list_clients() -> List[Dict[str, Any]]:
+def list_clients(_auth: str = Security(verify_api_key)) -> List[Dict[str, Any]]:
     """HTTP endpoint returning list of all registered corporate clients."""
     try:
         return client_service.get_all_clients()
@@ -31,7 +32,10 @@ def list_clients() -> List[Dict[str, Any]]:
     summary="Get reports owned and accessible by a client",
     status_code=status.HTTP_200_OK,
 )
-def get_client_reports(client_id: str) -> Dict[str, Any]:
+def get_client_reports(
+    client_id: str,
+    _auth: str = Security(verify_api_key),
+) -> Dict[str, Any]:
     """
     HTTP endpoint returning only the licensed reports purchased by this client,
     plus standard public excerpts permitted under their contract.

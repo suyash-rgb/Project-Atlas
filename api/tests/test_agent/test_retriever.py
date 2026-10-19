@@ -80,13 +80,12 @@ def test_retrieve_for_client_filters_by_entitlements(monkeypatch):
     assert results[1].report_id == "R-102"
     assert results[1].access == "public excerpt"
 
-    # Verify that as_retriever received filters containing R-101 and public reports (R-102, R-105)
+    # Verify that as_retriever received filters containing R-101 and public report R-102
     call_args = retriever._index.as_retriever.call_args
     filters_arg = call_args[1]["filters"]
     filter_value = filters_arg.filters[0].value
     assert "R-101" in filter_value
     assert "R-102" in filter_value
-    assert "R-105" in filter_value
 
 
 def test_retrieve_for_client_empty_allowed_reports_returns_empty_safely(monkeypatch):
