@@ -156,57 +156,80 @@
         const clientSelect = document.getElementById('clientSelect');
         const entitlementList = document.getElementById('entitlementList');
 
-        // Client Library Mapping for Demonstration matching MySQL seed
-        const clientReportMap = {
-            'C-01': [
-                { id: 'R-101', title: 'Global Smart Water Meter Market 2025', year: 2024, type: 'Full Turnkey (Paid)' },
-                { id: 'R-103', title: 'Residential Water Purifier Market 2025', year: 2024, type: 'Full Turnkey (Paid)' },
-                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' },
-                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Public Excerpt' }
-            ],
-            'C-02': [
-                { id: 'R-103', title: 'Residential Water Purifier Market 2025', year: 2024, type: 'Full Turnkey (Paid)' },
-                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' },
-                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Public Excerpt' }
-            ],
-            'C-03': [
-                { id: 'R-104', title: 'Commercial Industrial Water Treatment 2025', year: 2024, type: 'Full Turnkey (Paid)' },
-                { id: 'R-106', title: 'Decentralized Wastewater Treatment 2025', year: 2024, type: 'Full Turnkey (Paid)' },
-                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' },
-                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Public Excerpt' }
-            ],
-            'C-04': [
-                { id: 'R-101', title: 'Global Smart Water Meter Market 2025', year: 2024, type: 'Full Turnkey (Paid)' },
-                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' },
-                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Public Excerpt' }
-            ],
-            'C-05': [
-                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Licensed & Public' },
-                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' }
-            ],
-            'C-06': [
-                { id: 'R-102', title: 'Smart Water Metering Industry Outlook 2024', year: 2024, type: 'Public Excerpt' },
-                { id: 'R-105', title: 'Smart Multi-Utility Metering Outlook 2024', year: 2024, type: 'Public Excerpt' }
-            ]
-        };
-
-        function updateSidebarEntitlements() {
+        async function updateSidebarEntitlements() {
             const cid = clientSelect.value;
-            const reports = clientReportMap[cid] || [];
+            entitlementList.innerHTML = '<div style="font-size: 0.78rem; color: #64748b; padding: 0.5rem;"><i class="fa-solid fa-spinner fa-spin"></i> Loading entitled reports...</div>';
+
+            try {
+                const res = await fetch(`http://127.0.0.1:8085/api/v1/clients/${cid}/reports`);
+                if (res.ok) {
+                    const data = await res.json();
+                    renderReportCards(data.reports || []);
+                    return;
+                }
+            } catch (err) {
+                console.warn('API lookup failed, falling back to local client mapping:', err);
+            }
+
+            // Fallback matching database seed
+            const fallbackMap = {
+                'C-01': [
+                    { id: 'R-101', title: 'Global Smart Water Meter Market 2025', sector: 'Utilities', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
+                    { id: 'R-103', title: 'Residential Water Purifier Market 2025', sector: 'Consumer Durables', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
+                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false },
+                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
+                ],
+                'C-02': [
+                    { id: 'R-103', title: 'Residential Water Purifier Market 2025', sector: 'Consumer Durables', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
+                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false },
+                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
+                ],
+                'C-03': [
+                    { id: 'R-104', title: 'Commercial & Industrial RO Membrane Systems 2025', sector: 'Industrial Equipment', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
+                    { id: 'R-106', title: 'Decentralized Wastewater Recycling Systems 2025', sector: 'Cleantech', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
+                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false },
+                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
+                ],
+                'C-04': [
+                    { id: 'R-101', title: 'Global Smart Water Meter Market 2025', sector: 'Utilities', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
+                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false },
+                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
+                ],
+                'C-05': [
+                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Full Turnkey (Purchased)', is_purchased: true },
+                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
+                ],
+                'C-06': [
+                    { id: 'R-102', title: 'Smart Water Metering: Industry Outlook 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false },
+                    { id: 'R-105', title: 'Smart Multi-Utility Metering Infrastructure 2024', sector: 'Utilities', entitlement_type: 'Public Excerpt', is_purchased: false }
+                ]
+            };
+            renderReportCards(fallbackMap[cid] || []);
+        }
+
+        function renderReportCards(reports) {
             entitlementList.innerHTML = '';
-            
+            if (!reports || reports.length === 0) {
+                entitlementList.innerHTML = '<div style="font-size: 0.78rem; color: #94a3b8; font-style: italic;">No licensed reports found for this account.</div>';
+                return;
+            }
+
             reports.forEach(r => {
                 const card = document.createElement('div');
                 card.className = 'entitled-report-card';
+                const isPurchased = r.is_purchased !== false && (r.entitlement_type || '').includes('Purchased');
+                const badgeColor = isPurchased ? '#0284c7' : '#0d9488';
+                const lockIcon = isPurchased ? '<i class="fa-solid fa-lock-open"></i> Licensed' : '<i class="fa-solid fa-file-lines"></i> Public Excerpt';
+
                 card.innerHTML = `
                     <div style="display: flex; justify-content: space-between; align-items: center;">
                         <span class="report-badge-id">${r.id}</span>
-                        <span style="font-size: 0.7rem; color: #0284c7; font-weight: 600;">${r.type}</span>
+                        <span style="font-size: 0.7rem; color: ${badgeColor}; font-weight: 600;">${r.entitlement_type || 'Licensed'}</span>
                     </div>
                     <div class="title">${r.title}</div>
                     <div class="meta">
-                        <span>Year: ${r.year}</span>
-                        <span style="color: #059669;"><i class="fa-solid fa-lock-open"></i> Licensed</span>
+                        <span>${r.sector || 'Market Report'}</span>
+                        <span style="color: #059669; font-weight: 600;">${lockIcon}</span>
                     </div>
                 `;
                 entitlementList.appendChild(card);
