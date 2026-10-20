@@ -10,6 +10,8 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="icon" type="image/png" href="<?php echo parse_url(base_url('assets/images/logo.png'), PHP_URL_PATH); ?>">
     <link rel="stylesheet" href="<?php echo parse_url(base_url('assets/css/style.css'), PHP_URL_PATH); ?>">
+    <script src="<?php echo parse_url(base_url('assets/js/marked.min.js'), PHP_URL_PATH); ?>"></script>
+    <script src="<?php echo parse_url(base_url('assets/js/markdown.js'), PHP_URL_PATH); ?>"></script>
 </head>
 <body>
 

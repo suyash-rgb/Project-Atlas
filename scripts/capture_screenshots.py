@@ -71,18 +71,34 @@ def main():
         page.screenshot(path=os.path.join(output_dir, "04_copilot_chat.png"))
 
         # Step 5: Submit Query & Capture Response
-        print("  -> Capturing Step 5: Response with In-Text Citations & Conflict Box...")
+        print("  -> Capturing Step 5: Response with In-Text Citations & Table Rendering...")
+        # Select C-04 for water utility scenario
+        client_select = page.locator("#loginClientSelect")
+        if client_select.is_visible():
+            page.select_option("#loginClientSelect", "C-04")
+            login_btn = page.locator("#loginFormView .btn-auth-submit")
+            if login_btn.is_visible():
+                login_btn.click()
+                page.wait_for_timeout(1000)
+
         query_input = page.locator("textarea, input[placeholder*='Ask']").first
         if query_input.is_visible():
-            query_input.fill("What was the global smart water meter market size in 2024?")
-            send_btn = page.locator("button:has-text('Send'), button[type='submit']").first
+            query_input.fill("What was the smart water meter market size in 2024?")
+            send_btn = page.locator("#sendBtn, button:has-text('Send')").first
             if send_btn.is_visible():
                 send_btn.click()
-                page.wait_for_timeout(4000)
+                try:
+                    page.wait_for_selector(".answer-content table", timeout=25000)
+                    page.wait_for_timeout(1000)
+                    page.evaluate("() => { const tbl = document.querySelector('.answer-content table'); if (tbl) { tbl.scrollIntoView({block: 'center'}); const cs = document.getElementById('chatStream'); if (cs) cs.scrollTop = Math.max(0, cs.scrollTop - 85); } }")
+                    page.wait_for_timeout(800)
+                except Exception:
+                    page.wait_for_timeout(4000)
+
         page.screenshot(path=os.path.join(output_dir, "05_query_response_citations.png"))
 
         browser.close()
-        print(f"[✓] Successfully captured 5 evaluator screenshots to {output_dir}!")
+        print(f"[OK] Successfully captured 5 evaluator screenshots to {output_dir}!")
 
 if __name__ == "__main__":
     main()

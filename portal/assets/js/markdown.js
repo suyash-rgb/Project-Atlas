@@ -22,13 +22,13 @@
                 .replace(/~~(.+?)~~/g, '<del>$1</del>')
                 .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
                     '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
-                .replace(/(^|[^*])\*([^*\n]+)\*/g, '$1<em>$2</em>')
-                .replace(/(^|[^_])_([^_\n]+)_/g, '$1<em>$2</em>');
+                .replace(/(^|[^*])\*([^*\n]+)\*/g, function(_, p1, p2) { return p1 + '<em>' + p2 + '</em>'; })
+                .replace(/(^|[^_])_([^_\n]+)_/g, function(_, p1, p2) { return p1 + '<em>' + p2 + '</em>'; });
         }).join('');
     }
 
     function isTableDelimiter(line) {
-        return /^\s*\|?\s*:?-{3,}:?\s*(?:\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(line);
+        return /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)+\|?\s*$/.test(line);
     }
 
     function isTableStart(lines, index) {
@@ -88,9 +88,23 @@
     }
 
     function renderAtlasMarkdown(markdown) {
-        var lines = String(markdown == null ? '' : markdown)
-            .replace(/\r\n?/g, '\n')
-            .split('\n');
+        if (!markdown) return '';
+        var raw = String(markdown);
+
+        // 1. First priority: Use battle-tested marked parser if available
+        if (typeof global.marked !== 'undefined' && typeof global.marked.parse === 'function') {
+            try {
+                return global.marked.parse(raw, {
+                    gfm: true,
+                    breaks: true
+                });
+            } catch (e) {
+                console.warn('marked parse failed, falling back to internal parser:', e);
+            }
+        }
+
+        // 2. High-reliability fallback parser
+        var lines = raw.replace(/\r\n?/g, '\n').split('\n');
         var html = '';
         var index = 0;
 
@@ -177,4 +191,4 @@
     }
 
     global.renderAtlasMarkdown = renderAtlasMarkdown;
-}(window));
+})(typeof window !== 'undefined' ? window : this);
