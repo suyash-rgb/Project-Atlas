@@ -405,12 +405,14 @@ def synthesizer_node(state: AgentState, config: RunnableConfig) -> Dict[str, Any
 
 def route_after_guardrail(state: AgentState) -> str:
     """Conditional router based on Laya classification."""
-    if state.get("is_attack") or state.get("intent") in ["prompt_injection", "sql_attack"]:
+    if state.get("is_attack"):
         return "security_audit_node"
     if state.get("requires_escalation"):
         return "uncertainty_escalation_node"
     
     intent = state.get("intent", "factual_lookup")
+    if intent in ["prompt_injection", "sql_attack"]:
+        return "uncertainty_escalation_node"
     if intent == "database_aggregate":
         return "sql_execution_node"
     elif intent == "calculation":

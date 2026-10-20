@@ -125,7 +125,8 @@ class ChatService:
             completion_tokens = int(len(response.answer.split()) * 1.35)
 
             # Store in query caches (Exact LRU + Redis Vector Semantic Cache)
-            if not history:
+            # Never poison cache with escalations, security alerts, or clarification requests
+            if not history and not response.escalated and not getattr(response, "clarification_needed", False):
                 telemetry.cache.set(cleaned_client, cleaned_question, response)
                 semantic_cache.set(cleaned_client, cleaned_question, response)
 
