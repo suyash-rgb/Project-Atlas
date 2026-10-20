@@ -94,11 +94,8 @@ class LayaRouter:
         except Exception as exc:
             logger.exception("router_inference_failed error_type=%s", type(exc).__name__)
             raise RuntimeError("Intent classification failed.") from exc
-        
-        #temp fix for false positives  caused by small length queries like greetings
-        # Require statistical confidence (>= 0.65) to declare an attack,
-        # preventing low-confidence noise from firing false-positive security alarms
-        is_attack = choice in ["prompt_injection", "sql_attack"] and confidence >= 0.65
+
+        is_attack = choice in ["prompt_injection", "sql_attack"]
         requires_escalation = is_attack or (confidence < 0.65)
         logger.info(
             "router_decision intent=%s confidence=%.3f attack=%s",

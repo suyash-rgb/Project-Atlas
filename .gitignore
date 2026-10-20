@@ -69,3 +69,7 @@ docker-compose.override.yml
 models/**/checkpoint_*
 models/**/*.safetensors
 test_donut.png
+
+# Local Test Reports and Exports
+*.xlsx
+test_run_results.txt
