@@ -45,6 +45,27 @@ class RouterDecision(BaseModel):
     requires_escalation: bool
 
 
+GREETING_PATTERNS = {
+    "hi", "hello", "hey", "hiya", "howdy", "hola", "greetings",
+    "good morning", "good afternoon", "good evening", "good day",
+    "what's up", "whats up", "sup", "yo", "hi there", "hello there",
+    "hey there", "who are you", "what can you do", "help", "thanks", "thank you"
+}
+
+ATTACK_KEYWORDS = [
+    "drop table", "delete from", "truncate", "drop database", "union select",
+    "alter table", "insert into", "exec(", "xp_cmdshell",
+    "ignore your instructions", "system prompt", "jailbreak", "override",
+    "developer mode", "bypass guardrails", "list all client emails",
+    "exfiltrate", "dump password", "admin credentials"
+]
+
+
+def is_greeting(query: str) -> bool:
+    q = query.strip().lower().rstrip("!.,?").strip()
+    return q in GREETING_PATTERNS
+
+
 class LayaRouter:
     _instance: Optional["LayaRouter"] = None
     _agent: Any = None
@@ -69,7 +90,9 @@ class LayaRouter:
             self._agent = None
 
     def _heuristic_route(self, query: str):
-        q = query.lower()
+        q = query.lower().strip()
+        if is_greeting(q):
+            return "out_of_scope", 0.98
         if any(term in q for term in ["ignore your instructions", "system prompt", "list all client emails", "jailbreak", "override"]):
             return "prompt_injection", 0.95
         if any(term in q for term in ["drop table", "delete from", "truncate", "drop database", "union select", "alter table"]):
@@ -83,6 +106,16 @@ class LayaRouter:
         return "factual_lookup", 0.92
 
     def route(self, query: str) -> RouterDecision:
+        # Fast path: Common conversational greetings and casual pleasantries
+        if is_greeting(query):
+            logger.info("router_greeting_detected query='%s'", query[:30])
+            return RouterDecision(
+                intent="out_of_scope",
+                confidence=0.98,
+                is_attack=False,
+                requires_escalation=False,
+            )
+
         try:
             if self._agent is not None:
                 res = self._agent.predict(query, INTENT_QUESTIONS)
@@ -95,8 +128,28 @@ class LayaRouter:
             logger.exception("router_inference_failed error_type=%s", type(exc).__name__)
             raise RuntimeError("Intent classification failed.") from exc
 
-        is_attack = choice in ["prompt_injection", "sql_attack"]
-        requires_escalation = is_attack or (confidence < 0.65)
+        # Attack classification safety verification
+        has_attack_pattern = any(term in query.lower() for term in ATTACK_KEYWORDS)
+        if choice in ["prompt_injection", "sql_attack"]:
+            # If the model chose an attack category with very low confidence (< 0.65)
+            # and no adversarial keywords exist, treat it as general out-of-scope rather than false-alarm attack
+            if not has_attack_pattern and confidence < 0.65:
+                logger.warning(
+                    "router_false_positive_attack_downgraded raw_choice=%s confidence=%.3f query='%s'",
+                    choice,
+                    confidence,
+                    query[:50],
+                )
+                choice = "out_of_scope"
+                is_attack = False
+                requires_escalation = False
+            else:
+                is_attack = True
+                requires_escalation = True
+        else:
+            is_attack = False
+            requires_escalation = confidence < 0.65
+
         logger.info(
             "router_decision intent=%s confidence=%.3f attack=%s",
             choice,

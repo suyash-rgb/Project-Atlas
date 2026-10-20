@@ -131,6 +131,107 @@ In compliance with section 5 of the evaluation requirements (*"Evaluation report
 
 ---
 
+### Failure Case 6: High-Entropy False-Positive Security Escalation on Casual Greetings (`"hi"`)
+
+* **Input Query**: `"hi"` (Client `C-01` or `C-04` initiating a session).
+* **Observed Failure in Live Prototype**:
+  The system incorrectly flagged the user's friendly single-word greeting as an adversarial attack, locked out the session, and issued a high-severity compliance ticket:
+  > `[SECURITY ALERT] Your query has been flagged and blocked by our Automated Compliance & Security Guardrail. Adversarial prompts, system override attempts, and unauthorized database operations are strictly prohibited. This incident has been logged for administrative security review under ticket [ESC-0064].`
+
+![Live Failure: "hi" Flagged as Security Risk](docs/assets/failure_false_positive_hi_flagged.png)
+
+#### 1. Deep Root Cause Analysis (RCA)
+
+Our empirical audit revealed four compounding factors spanning dataset synthesis, sequence length priors, uncalibrated argmax logic, and vector caching:
+
+1. **Dataset Generation Filter Bias (`build_dataset.py`)**:
+   In [`scripts/build_dataset.py`](scripts/build_dataset.py#L308), the synthetic pipeline enforced a hard length threshold:
+   ```python
+   if len(q) > 10 and q not in domain_samples[cls]:
+   ```
+   This dropped all short natural conversational tokens (`"hi"`, `"hello"`, `"hey"`, `"thanks"`). Furthermore, the Groq generation prompt instructed the model to create encyclopedic trivia for `out_of_scope` (*"How do I repair a leaking faucet?"*, *"Who directed Interstellar?"*), resulting in an average sequence length of **50.8 characters** and a minimum length of **23 characters**. Out of 150 training samples and 30 validation samples for `out_of_scope`, **exactly 0 conversational greetings were included**.
+
+2. **Sequence Length Prior Skew**:
+   Across all 1,260 curated samples in the training set, there are 34 samples under 20 characters in length. **33 of them belong to `sql_attack`** (e.g., `'" or "x"="x'`, `'1\' ORDER BY 1--+'`, `'or pg_SLEEP(5)--'`), and **0 belong to `out_of_scope`**. Because ModernBERT attends to sequence length and position embeddings, presenting a 2-character input placed `"hi"` into an extreme Out-of-Distribution (OOD) region for legitimate user queries while heavily overlapping with short SQL injection fragments.
+
+3. **The Argmax Trap on Near-Uniform Uncertainty**:
+   In the server execution log (`task-6977.log`):
+   ```log
+   INFO project_atlas.agent.router router_decision intent=sql_attack confidence=0.086 attack=True
+   ```
+   With 7 classes, a purely uniform random distribution assigns $1/7 \approx 14.3\%$ probability per class. A confidence score of **0.086 (8.6%)** represents **pure model entropy** (the model had zero certainty). However, taking the raw `argmax` selected `sql_attack` because its uncalibrated logit was trivially higher than the other near-zero probabilities.
+
+4. **Zero-Threshold Guardrail Bug in Code**:
+   In [`api/app/agent/router.py`](api/app/agent/router.py) and [`api/app/agent/graph.py`](api/app/agent/graph.py), the edge routing logic evaluated:
+   ```python
+   # Defective original logic:
+   is_attack = choice in ["prompt_injection", "sql_attack"]
+   ```
+   The code checked only the class name **without enforcing a confidence floor**. An 8.6% guess was therefore treated as a 100% confirmed security breach.
+
+5. **Semantic Cache Poisoning**:
+   [`api/app/services/chat_service.py`](api/app/services/chat_service.py#L130) stored all top-level responses into `semantic_cache` without checking `not response.escalated`. The security refusal vector for `"hi"` was consequently cached, instantly blocking subsequent greetings from the vector cache.
+
+---
+
+#### 2. Training Corpus Length & Distribution Audit Table
+
+| Intent Class | Sample Count | Min Length | Avg Length | Max Length | Samples < 20 Chars | Conversational Greetings |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| `factual_lookup` | 150 | 41 chars | 94.0 chars | 395 chars | 0 | 0 |
+| `database_aggregate` | 150 | 38 chars | 88.5 chars | 318 chars | 0 | 0 |
+| `calculation` | 150 | 22 chars | 112.3 chars | 441 chars | 0 | 0 |
+| `comparison` | 150 | 52 chars | 129.1 chars | 489 chars | 0 | 0 |
+| **`out_of_scope`** | **150** | **23 chars** | **50.8 chars** | **100 chars** | **0** | **0 (Zero!)** |
+| `prompt_injection` | 150 | 17 chars | 197.0 chars | 4,545 chars | 1 | 0 |
+| **`sql_attack`** | **150** | **9 chars** | **62.3 chars** | **200 chars** | **33 (97% of all short)** | 0 |
+
+---
+
+#### 3. Flowchart: Failure Loop vs. Calibrated Guardrail Routing
+
+```mermaid
+flowchart TD
+    subgraph Defective_Workflow["Defective Workflow (Prior)"]
+        A1["User Query: 'hi'"] --> B1["Laya 421M Decision Head"]
+        B1 --> C1["Logits: Uniform Noise<br/>sql_attack: 0.086 (8.6%)"]
+        C1 --> D1{"Raw Argmax Check<br/>choice in [sql_attack]?"}
+        D1 -- Yes (No Threshold) --> E1["Security Guardrail Alarm!"]
+        E1 --> F1["Log Escalation Ticket [ESC-0064]"]
+        F1 --> G1["Store Refusal in Semantic Cache"]
+        G1 --> H1["Output: [SECURITY ALERT] Blocked!"]
+    end
+
+    subgraph Calibrated_Workflow["Calibrated Robust Workflow (Remediated)"]
+        A2["User Query: 'hi' / 'hello'"] --> B2["Laya Router Inference"]
+        B2 --> C2{"Is Attack Category<br/>AND Confidence >= 0.65<br/>OR Regex Attack Signature?"}
+        C2 -- Yes --> D2["True Security Attack -> security_audit_node"]
+        C2 -- No --> E2{"Is Model Uncertain<br/>(Confidence < 0.65)?"}
+        E2 -- Yes --> F2["Downgrade to out_of_scope<br/>or uncertainty_escalation_node"]
+        E2 -- No --> G2["Route to Selected Intent Node"]
+        F2 --> H2["Polite Fallback Greeting Response"]
+        H2 --> I2["Do NOT Cache Escalation in Semantic Cache"]
+    end
+
+    style Defective_Workflow fill:#fff1f2,stroke:#f43f5e,stroke-width:2px
+    style Calibrated_Workflow fill:#f0fdf4,stroke:#22c55e,stroke-width:2px
+```
+
+---
+
+#### 4. Engineering Remediation & Roadmap
+
+1. **Guardrail Confidence Calibration (`router.py` & `graph.py`)**:
+   - Attacks now require statistical confidence ($\ge 0.65$) or verified malicious syntax before invoking `security_audit_node`.
+   - Low-confidence attack guesses without adversarial keywords are safely downgraded to `out_of_scope`.
+   - `out_of_scope_node` returns a warm, professional greeting and capability overview rather than a security warning.
+2. **Cache Poisoning Safeguard (`chat_service.py`)**:
+   - Added `if not history and not response.escalated:` before setting entries in `telemetry.cache` and `semantic_cache`.
+3. **Dataset Rebalancing & Retraining Plan**:
+   - Detailed in [`ONE_PAGE_NOTE.md`](ONE_PAGE_NOTE.md): re-curating the dataset without arbitrary length filters to balance short conversational pleasantries and retrain Laya 421M.
+
+---
+
 ## 4. Evaluation Suite Reproducibility
 
 To re-run the benchmark on any machine:

@@ -38,12 +38,14 @@ Here are the 5 high-impact initiatives I would execute, organized by technical l
 
 ---
 
-### 4. Active Continuous Fine-Tuning Loop for Guardrails & Routing
-* **Current State**: The fine-tuned Laya 421M model operates on pre-quantized weights for sub-40ms routing and perimeter defense, trained on our initial 1,260 curated samples.
+### 4. Dataset Quality Rebalancing & Active Continuous Fine-Tuning Loop for Guardrails
+* **Current State**: 
+  - The fine-tuned Laya 421M model operates on pre-quantized weights for sub-40ms routing and perimeter defense, trained on our initial 1,260 curated samples across 7 categories.
+  - However, our empirical audit identified a critical training data gap: synthetic dataset generation scripts previously enforced a `len(q) > 10` filter, inadvertently stripping all short conversational tokens (`"hi"`, `"hello"`, `"hey"`) from `out_of_scope` while short tokens in the dataset were heavily dominated by SQL attack fragments (`'-- drop'`, `'or true--'`). This caused out-of-distribution greetings to yield near-uniform entropy and false-positive security escalations.
 * **One-Week Enhancement**:
-  - Build an automated **Continuous Hard-Negative Mining Loop**: user feedback (thumbs down) and human escalation tickets stored in the MySQL `feedback` and `escalations` tables will automatically be extracted and labelled.
-  - Formulate structured supervised retraining datasets from edge-case client queries that exhibited boundary ambiguity.
-  - Trigger a scheduled weekly retraining and ONNX export pipeline, continuously hardening the guardrail router against newly emerging prompt injection and exfiltration patterns with zero downtime.
+  - **Dataset Quality Improvement & Rebalancing**: Eliminate arbitrary sequence length cutoffs in `scripts/build_dataset.py`. Rebalance the `out_of_scope` class by synthesizing 150+ diverse, natural conversational greetings, pleasantries, and multi-turn conversational openers across 4 realistic enterprise personas (formal corporate, informal mobile chat, brief, and multilingual).
+  - **Re-Fine-Tuning Laya 421M with Calibrated Confidence Loss**: Retrain Laya's ModernBERT backbone and 26M decision head on Kaggle's dual NVIDIA T4 GPUs with temperature scaling and negative boundary anchors. This ensures the model learns calibrated probability outputs that cleanly separate casual conversational pleasantries from true SQL injection attempts without relying on fragile keyword heuristics.
+  - **Continuous Hard-Negative Mining Pipeline**: Build an automated data collection loop that extracts user feedback (thumbs down) and escalation tickets (such as ticket `[ESC-0064]`) stored in the MySQL `feedback` and `escalations` tables. Automatically format edge-case client queries into structured supervised retraining datasets for scheduled weekly model refinement.
 
 ---
 
