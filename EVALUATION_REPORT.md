@@ -228,19 +228,16 @@ flowchart TD
 2. **Cache Poisoning Safeguard (`chat_service.py`)**:
    - Added `if not history and not response.escalated:` before setting entries in `telemetry.cache` and `semantic_cache`.
 3. **Dataset Rebalancing & Retraining Plan**:
-   - Detailed in [`ONE_PAGE_NOTE.md`](ONE_PAGE_NOTE.md): re-curating the dataset without arbitrary length filters to balance short conversational pleasantries and retrain Laya 421M.
+   - Re-curating the dataset without arbitrary length filters to balance short conversational pleasantries and retrain Laya 421M.
 
 ---
 
 ## 4. Evaluation Suite Reproducibility
 
-To re-run the benchmark on any machine:
+To re-run the benchmark:
 
 ```bash
-# Inside the Docker API container:
-docker compose exec api python scripts/run_eval_suite.py
-
-# Or on local virtual environment:
+# In local virtual environment:
 python scripts/run_eval_suite.py
 ```
 

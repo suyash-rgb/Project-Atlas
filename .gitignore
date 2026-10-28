@@ -52,9 +52,6 @@ qdrant_storage/
 Thumbs.db
 Desktop.ini
 
-# Docker local overrides
-docker-compose.override.yml
-
 # Large Model Weights (Hosted publicly on Hugging Face)
 *.safetensors
 *.bin
@@ -63,6 +60,10 @@ models/**/checkpoint_*
 models/**/*.safetensors
 test_donut.png
 
-# Local Test Reports and Exports
+# Local Test Reports, Specs, and Exports
 *.xlsx
+*.docx
+AI_Developer_Assignment*.pdf
 test_run_results.txt
+eval_live_api_results.json
+msg.txt

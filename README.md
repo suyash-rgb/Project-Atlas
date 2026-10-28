@@ -1,10 +1,9 @@
 # Project Atlas — Report Copilot
 ### Cognitive Market Research & Consulting | Enterprise Agentic AI Intelligence Platform
 
-[![Docker Compose](https://img.shields.io/badge/Docker%20Compose-Ready%20(Linux%2FmacOS%2FWin)-blue?logo=docker)](docker-compose.yml)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115+-009688?logo=fastapi)](api)
 [![LangGraph](https://img.shields.io/badge/LangGraph-Agentic%20State%20Machine-orange)](api/app/agent/graph.py)
-[![MySQL](https://img.shields.io/badge/MySQL-8.0%20InnoDB-4479A1?logo=mysql)](docker/mysql)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0%20InnoDB-4479A1?logo=mysql)](data/init.sql)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?logo=python)](pyproject.toml)
 [![Tests](https://img.shields.io/badge/Pytest-261%20Collected-brightgreen)](api/tests)
 [![CI](https://github.com/suyash-rgb/Project-Atlas/actions/workflows/ci.yml/badge.svg)](https://github.com/suyash-rgb/Project-Atlas/actions/workflows/ci.yml)
@@ -28,21 +27,21 @@ This repository contains the complete official take-home assignment submission f
 | **Demo Video Link** | [Demo Video — Google Drive (Access: Anyone with the link – Viewer)](https://drive.google.com/drive/folders/1placeholder-project-atlas-demo?usp=sharing) | 3–5 Min Walkthrough |
 | **README Included?** | **Yes** — Setup guide, port map, test commands, architecture diagrams, and live evaluator queries | Included |
 | **Evaluation Report Included?** | **Yes** — [`EVALUATION_REPORT.md`](EVALUATION_REPORT.md) (All 26 test cases, live harness metrics, 5 failure deep dives) | Included |
-| **One-Page Note Included?** | **Yes** — [`ONE_PAGE_NOTE.md`](ONE_PAGE_NOTE.md) ("What I would do with one more week") | Included |
-| **Have you tested your complete project?** | **Yes** — 174 passing unit/integration tests + 26-case live automated benchmark suite | 100% Tested |
+| **Have you tested your complete project?** | **Yes** — 261 unit/integration tests + 26-case live automated benchmark suite | 100% Tested |
 | **No API Keys or Secrets Committed?** | **Yes** — Zero confidential keys committed; `.gitignore` enforced; sanitized `.env.example` | Clean & Safe |
 | **Disclosed Use of AI Coding Tools?** | **Yes** — Pair-programmed with Antigravity / Claude / Gemini / Groq; full transparency disclosure below | Fully Disclosed |
 
 ---
 
-## ⚡ Quickstart: Launch Everything in Under 5 Minutes (Linux / Docker)
+## ⚡ Quickstart: Launch Everything in Under 5 Minutes
 
-A new reviewer or evaluator can start the entire stack (**FastAPI Intelligence Microservice, MySQL 8.0, and Redis Vector Cache**) in under 5 minutes with a single `docker compose up` command.
+Run the FastAPI Intelligence Microservice locally with standard Python tools:
 
 ### 1. Prerequisites
-Ensure you have the following installed on your Linux / macOS / Windows (WSL2) host:
-* **Docker Engine** (24.0+) & **Docker Compose** (v2.20+)
+Ensure you have the following installed on your host:
+* **Python 3.11+**
 * A valid **Groq API Key** (for low-latency Llama-3 synthesis) — [Get a free key here](https://console.groq.com)
+* *(Optional)* A running **MySQL 8.0** instance and **Redis Stack** instance.
 
 ---
 
@@ -64,169 +63,53 @@ API_KEY=atlas_dev_secret_key
 GROQ_API_KEY=gsk_your_actual_groq_api_key_here
 GROQ_MODEL=openai/gpt-oss-20b
 
-# Shared MySQL Database Configuration
-MYSQL_ROOT_PASSWORD=atlas_root_super_secure_pass
-MYSQL_HOST_PORT=3307
-MYSQL_USER=atlas_app
-MYSQL_PASSWORD=atlas_app_secure_pass
-MYSQL_READONLY_USER=atlas_readonly
-MYSQL_READONLY_PASSWORD=atlas_readonly_pass
-DB_HOST=db
+# MySQL Database Configuration (Optional)
+DB_HOST=localhost
+MYSQL_PORT=3306
+MYSQL_DATABASE=project_atlas
+MYSQL_USER=root
+MYSQL_PASSWORD=your_password
 
-# In-Memory & Redis Vector Cache Engine
-REDIS_HOST=redis
+# In-Memory & Redis Vector Cache Engine (Optional)
+REDIS_HOST=localhost
 REDIS_PORT=6379
 SEMANTIC_CACHE_ENABLED=true
 SEMANTIC_CACHE_THRESHOLD=0.90
 ```
 
-> [!TIP]
-> **Port 3307 for MySQL**: `MYSQL_HOST_PORT` defaults to `3307` on the host to avoid port collisions with any local MySQL server running on `3306`. Internal container-to-container traffic automatically uses port `3306`.
-
 ---
 
-### 3. Docker Compose Orchestration (`docker-compose.yml`)
+### 3. Installation & Local Execution
 
-The multi-container topology is declared in [`docker-compose.yml`](docker-compose.yml). It ingests the `.env` variables above and links the database, vector cache, and intelligence engine on an isolated internal bridge network (`atlas_network`):
-
-```yaml
-services:
-  # -------------------------------------------------------------
-  # 1. MySQL Relational Database (Reports, Metrics, Clients, Audits)
-  # -------------------------------------------------------------
-  db:
-    image: mysql:8.0
-    container_name: atlas_mysql
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
-      MYSQL_DATABASE: project_atlas
-    ports:
-      - "${MYSQL_HOST_PORT:-3307}:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "--silent"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - atlas_network
-
-  db-roles:
-    image: mysql:8.0
-    restart: "no"
-    depends_on:
-      db:
-        condition: service_healthy
-    entrypoint: ["/bin/sh", "/scripts/create-readonly-user.sh"]
-    environment:
-      MYSQL_HOST: db
-      MYSQL_DATABASE: project_atlas
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Set MYSQL_ROOT_PASSWORD in .env}
-      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
-      MYSQL_READONLY_USER: ${MYSQL_READONLY_USER:?Set MYSQL_READONLY_USER in .env}
-      MYSQL_READONLY_PASSWORD: ${MYSQL_READONLY_PASSWORD:?Set MYSQL_READONLY_PASSWORD in .env}
-    volumes:
-      - ./docker/mysql/create-readonly-user.sh:/scripts/create-readonly-user.sh:ro
-    networks:
-      - atlas_network
-
-  # -------------------------------------------------------------
-  # 2. FastAPI Intelligence Engine (LangGraph + Laya 421M + RAG)
-  # -------------------------------------------------------------
-  api:
-    build:
-      context: .
-      dockerfile: api/Dockerfile
-    container_name: atlas_api
-    restart: unless-stopped
-    depends_on:
-      db-roles:
-        condition: service_completed_successfully
-    ports:
-      - "8000:8000"
-      - "8888:8000"
-    environment:
-      API_KEY: ${API_KEY:?Set API_KEY in .env}
-      GROQ_API_KEY: ${GROQ_API_KEY:?Set GROQ_API_KEY in .env}
-      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-20b}
-      MYSQL_HOST: db
-      MYSQL_PORT: 3306
-      MYSQL_DATABASE: project_atlas
-      MYSQL_USER: ${MYSQL_USER:?Set MYSQL_USER in .env}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Set MYSQL_PASSWORD in .env}
-      MYSQL_READONLY_USER: ${MYSQL_READONLY_USER:?Set MYSQL_READONLY_USER in .env}
-      MYSQL_READONLY_PASSWORD: ${MYSQL_READONLY_PASSWORD:?Set MYSQL_READONLY_PASSWORD in .env}
-      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
-      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
-      LANGFUSE_HOST: ${LANGFUSE_HOST:-}
-      HF_HOME: /app/data/.cache/huggingface
-      REDIS_HOST: ${REDIS_HOST:-redis}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      SEMANTIC_CACHE_ENABLED: ${SEMANTIC_CACHE_ENABLED:-true}
-      SEMANTIC_CACHE_THRESHOLD: ${SEMANTIC_CACHE_THRESHOLD:-0.90}
-    volumes:
-      - ./models:/app/models
-      - ./data:/app/data
-    networks:
-      - atlas_network
-
-  # -------------------------------------------------------------
-  # 3. Redis Vector Engine for Semantic Caching
-  # -------------------------------------------------------------
-  redis:
-    image: redis/redis-stack-server:latest
-    container_name: atlas_redis
-    restart: unless-stopped
-    ports:
-      - "${REDIS_PORT:-6379}:6379"
-    volumes:
-      - redis_data:/data
-    networks:
-      - atlas_network
-
-networks:
-  atlas_network:
-    driver: bridge
-
-volumes:
-  mysql_data:
-    driver: local
-  redis_data:
-    driver: local
-```
-
----
-
-### 4. Launch the Stack
-
-Run Docker Compose to build and launch all containers in detached mode:
+Create a virtual environment and install dependencies:
 
 ```bash
-docker compose up --build -d
+# Create virtual environment
+python -m venv .venv
+
+# Activate virtual environment
+# Windows (PowerShell):
+.venv\Scripts\Activate.ps1
+# Linux / macOS:
+source .venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
-Compose automatically orchestrates service startup in topological dependency order:
-1. `atlas_mysql` initializes schema and seeds reports (R-101–R-106) and clients (C-01–C-06) via `init.sql`.
-2. `db-roles` executes `create-readonly-user.sh` to provision the least-privilege `atlas_readonly` user.
-3. `atlas_redis` initializes the RediSearch vector similarity cache.
-4. `atlas_api` starts FastAPI, warms up the Laya 421M intent classifier, and pre-indexes report vector embeddings.
+*(Optional)* Initialize the MySQL database schema & seed data:
+```bash
+mysql -u root -p project_atlas < data/init.sql
+```
 
-Clients interact directly with the FastAPI service using API key authentication (`X-API-Key`) and pass their tenant identifier (`client_id`, e.g. `C-01`).
+Launch the FastAPI application:
+```bash
+uvicorn app.main:app --app-dir api --host 0.0.0.0 --port 8000 --reload
+```
 
 ---
 
-### 5. Verify Service Health
-
-Check container status:
-
-```bash
-docker compose ps
-```
+### 4. Verify Service Health
 
 Verify backend health probe:
 
@@ -237,14 +120,13 @@ curl -f http://localhost:8000/health
 
 ---
 
-## 🌐 Active Service Endpoints & Port Map
+## 🌐 Active Service Endpoints
 
-| Component | Container Name | Host Port | Internal Port | URL / Documentation |
-| :--- | :--- | :--- | :--- | :--- |
-| **FastAPI Backend Gateway** | `atlas_api` | `8000` | `8000` | [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI) |
-| **FastAPI Secondary Probe** | `atlas_api` | `8888` | `8000` | [http://localhost:8888/health](http://localhost:8888/health) |
-| **MySQL 8.0 Relational DB** | `atlas_mysql` | `3307` | `3306` | `project_atlas` (InnoDB Engine) |
-| **Redis Vector Semantic Cache** | `atlas_redis` | `6379` | `6379` | RediSearch Vector Similarity |
+| Component | Port | URL / Documentation |
+| :--- | :--- | :--- |
+| **FastAPI Backend Gateway** | `8000` | [http://localhost:8000/docs](http://localhost:8000/docs) (Interactive Swagger UI) |
+| **Health Probe** | `8000` | [http://localhost:8000/health](http://localhost:8000/health) |
+| **ReDoc Documentation** | `8000` | [http://localhost:8000/redoc](http://localhost:8000/redoc) |
 
 ---
 
@@ -325,19 +207,16 @@ Test these 5 critical query scenarios to verify the AI state machine's safety, a
 
 ## 🔬 Running Automated Tests & Evaluation Suite
 
-### Run the 174-Test Suite (Unit, Security & Integration)
-Inside the running API container:
+### Run the 261-Test Suite (Unit, Security & Integration)
 ```bash
-docker compose exec api pytest -v
+pytest -v api/tests/
 ```
-*(Or locally: `pytest -v api/tests/` from virtual environment)*
-*Result: **174 passed, 0 failed** (100% green).*
 
 ### Run the 26-Case End-to-End Evaluation Benchmark
 The project includes a comprehensive evaluation runner assessing Correctness, Citation Accuracy, Refusal Accuracy, and Conflict Detection:
 
 ```bash
-docker compose exec api python scripts/run_eval_suite.py
+python scripts/run_eval_suite.py
 ```
 
 ---
@@ -591,25 +470,9 @@ In adherence to the Cognitive Market Research assignment guidelines, we maintain
 
 ---
 
-## 🛑 Teardown & Troubleshooting
-
-### Stopping the Stack
-To stop all containers while **preserving** the MySQL database and Redis volumes:
-```bash
-docker compose down
-```
-
-To stop containers and **wipe** all stored database data:
-```bash
-docker compose down -v
-```
-
-### Viewing Real-Time Logs
-```bash
-docker compose logs -f --tail 100 api db redis
-```
+## 🛑 Troubleshooting
 
 ### Common Troubleshooting Tips
-* **Port 3306 in use on host**: Change `MYSQL_HOST_PORT=3307` in your `.env` file.
-* **FastAPI 503 Service Unavailable**: Ensure `API_KEY` in `.env` is non-empty.
-* **Correlating Failed Requests**: Inspect the `X-Request-ID` response header in browser DevTools and search for it in `docker compose logs api`.
+* **FastAPI 503 Service Unavailable / 401 Unauthorized**: Ensure `API_KEY` in `.env` matches the request header `X-API-Key`.
+* **Database Connection**: If running without MySQL, `metadata.py` falls back gracefully to in-memory runtime registries, and SQLite/ChromaDB will handle local storage.
+* **Correlating Requests**: Check `X-Request-ID` in the response headers or logs to trace request lifecycles across components.
